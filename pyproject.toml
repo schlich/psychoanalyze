@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "psychoanalyze"
+version = "0.1.0"
+description = ""
+authors = ["Tyler Schlichenmeyer <tyler.schlichenmeyer@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "3.8.3"
+jupyterlab = "^2.1.4"
+plotly = "^4.8.1"
+pandas = "^1.0.4"
+sklearn = "^0.0"
+ipywidgets = "^7.5.1"
+psutil = "^5.7.0"
+requests = "^2.23.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^3.4"
+pylint = "^2.5.3"

@@ -40,14 +40,15 @@ def threshold_v_time(df, export_path=None, stimulus_dimension='Amp'):
         fig.write_image(export_path, height=400, width=1200) # 'figures/feb_images/4a.svg'
     return fig
 
-def weber_plot(summary_df):
+def weber_plot(summary_df, groupings):
     fig = px.scatter(
         summary_df.reset_index(), 
         x='Ref Amp', 
         y='mean', 
         error_y='std', 
         size='count', 
-        color='Monkey',
+        color=groupings['color'],
+        symbol=groupings['symbol'],
         template=template,
     )
     return fig
