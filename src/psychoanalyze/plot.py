@@ -25,7 +25,7 @@ template.data.scatter = [go.Scatter( error_y_width=0, error_y_thickness=1,
 symbol_map = {'1':'circle', '2':'square', '3':'diamond', '4':'star-triangle-up', '5':'circle', '6':'square','7':'diamond','8':'star-triangle-up',
               '1+2':'circle-open', '2+3':'square-open', '3+4':'diamond-open', '4+1':'star-triangle-up-open',
               '1+2+3':'x','2+3+4':'x', '1+2+3+4':'x', '5+6+7+8':'x',
-              'Amp':'hourglass','PW':'bowtie'}
+              'Amp':'diamond-tall','PW':'diamond-wide'}
 
 def threshold_v_time(df, export_path=None, stimulus_dimension='Amp'):
     fig = px.scatter(df, x='Days', y='location', color='Monkey', error_y = 'err_upper_location', error_y_minus = 'err_lower_location', symbol='Channel(s)', template=template, symbol_map=symbol_map)

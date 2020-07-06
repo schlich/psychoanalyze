@@ -2,13 +2,6 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression as LinReg
 
 
-channel_map = {
-    '10000000':'1', '01000000':'2', '00100000':'3', '00010000':'4', '00001000':'5', '00000100':'6','00000010':'7','00000001':'8',
-    '11000000':'1+2', '01100000':'2+3', '00110000':'3+4', '10010000':'4+1', 
-    '11100000':'1+2+3', '01110000':'2+3+4',
-    '11110000':'1+2+3+4','00001111':'5+6+7+8',
-}
-
 def filter(df, experiment_type=None, ranges={}, values={}):
     ## TODO: implement ranges gt or lt single number
     def filter_ranges(df, ranges):
@@ -28,7 +21,7 @@ def filter(df, experiment_type=None, ranges={}, values={}):
     if experiment_type == 'discrimination':
         df = df[df['Ref Amp'] != 0 & (df['Ref PW'] > 5)]
     elif experiment_type == 'detection':
-        df = df[(df['Ref Amp'] == 0) | (df['Ref PW'] < 5)]
+        df = df[(df['Ref Amp'] < 5) | (df['Ref PW'] < 5)]
     
     return df
         
@@ -51,9 +44,12 @@ def channelint2mask(df):
     return df
 
 def channelmask2num(df):
-    # TODO: Ret chan mask should be Act chan mask
-    for key, value in channel_map.items():
-        df.loc[df['Ret Chan Mask'] == key,'Channel(s)'] = value
+    def convert(s):
+        channels = [i+1 for i, ltr in enumerate(s) if ltr == '1']
+        return '+'.join(map(str, channels))
+
+    df['Return Channel(s)'] = df['Ret Chan Mask'].apply(convert)
+    df['Channel(s)'] = df['Act Chan Mask'].apply(convert)
     return df
 
 def sort_channel_labels(df):
