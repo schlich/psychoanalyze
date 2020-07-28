@@ -14,6 +14,7 @@ ipywidgets = "^7.5.1"
 psutil = "^5.7.0"
 requests = "^2.23.0"
 tqdm = "^4.47.0"
+panel = "^0.9.7"
 
 [tool.poetry.dev-dependencies]
 pytest = "^3.4"

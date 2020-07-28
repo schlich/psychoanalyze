@@ -40,32 +40,33 @@ def threshold_v_time(df, export_path=None, stimulus_dimension='Amp'):
         fig.write_image(export_path, height=400, width=1200) # 'figures/feb_images/4a.svg'
     return fig
 
-def weber_plot(summary_df, groupings):
-    fig = px.scatter(
-        summary_df.reset_index(), 
-        x='Ref Amp', 
-        y='mean', 
-        error_y='std', 
-        size='count', 
-        color=groupings['color'],
-        symbol=groupings['symbol'],
-        template=template,
-    )
-    return fig
-
-def figure(fig_str):
-    df = pd.read_csv(f'../data/4-external/{fig_str}.csv', dtype={'Channel(s)':str})
-    df = sort_channel_labels(df)
-    fig = threshold_v_time(df)
-    return fig
-
-def fig_w_regression(fig_str, regression=True):
-    data = pd.read_csv(f'../data/4-external/{fig_str}.csv')
-    with open(f'../data/4-external/{fig_str}_regressions.json') as f:
-        regressions = json.load(f)
-    fig = weber_plot(data)
+def weber_plot(df):
+    groups = ['Monkey','Ref Amp']
+    summary = df.groupby(groups).describe().reset_index().dropna()
+    regressions = data.regress_groups(summary, groups)
     for monkey in regressions.keys():
         x = regressions[monkey]['x']
         y = regressions[monkey]['y']
         fig.add_scatter(x=x,y=y,mode='lines', showlegend=False, marker_color=colormap[monkey])
+
+    fig = px.scatter(
+        summary, 
+        x='Ref Amp', 
+        y='mean', 
+        error_y='std', 
+        size='count', 
+        color='Monkey',
+        symbol='Channel(s)',
+        template=template,
+    )
+    return fig
+
+def figure(fig_str, fig_type):
+    df = pd.read_csv(f'../data/4-external/{fig_str}.csv', dtype={'Channel(s)':str})
+    df = sort_channel_labels(df)
+    df = df.dropna()
+    if fig_type == 'abs_thresh':
+        fig = threshold_v_time(df)
+    elif fig_type == 'weber':
+        fig = weber_plot(df)
     return fig

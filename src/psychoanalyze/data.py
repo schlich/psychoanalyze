@@ -1,8 +1,17 @@
 import pandas as pd
 from sklearn.linear_model import LinearRegression as LinReg
 
+distal_group = [
+    '1','2','3','4','1+2','2+3','3+4','1+4',
+    '1+2+3','2+3+4','1+3+4','1+2+4', 
+    '1+2+3+4',
+]
+proximal_group = [
+    '5','6','7','8','5+6','6+7','7+8','5+8',
+    '5+6+7','6+7+8','5+7+8','5+6+8','5+6+7+8'
+]
 
-def filter(df, experiment_type=None, ranges={}, values={}):
+def filter(df, experiment_type=None, electrode_config=None, ranges={}, values={}):
     ## TODO: implement ranges gt or lt single number
     def filter_ranges(df, ranges):
         for param, bounds in ranges.items():
@@ -10,10 +19,9 @@ def filter(df, experiment_type=None, ranges={}, values={}):
         return df
     def filter_values(df, lists):
         for param, value in lists.items():
-            value = [value] if not isinstance(value, list) else value
+            value = [value] if not (isinstance(value, list) | (isinstance(value, tuple))) else value
             df = df[df[param].isin(value)]
         return df
-
     if ranges:
         df = filter_ranges(df, ranges)
     if values:
@@ -22,7 +30,6 @@ def filter(df, experiment_type=None, ranges={}, values={}):
         df = df[df['Ref Amp'] != 0 & (df['Ref PW'] > 5)]
     elif experiment_type == 'detection':
         df = df[(df['Ref Amp'] < 5) | (df['Ref PW'] < 5)]
-    
     return df
         
 def remove_outliers(df, identifier, ids):
@@ -84,3 +91,7 @@ def regress_groups(df,groups):
             'intercept': regression.intercept_
         }
     return regressions
+
+# def polarity(curve_series):
+#     if curve_series['Channel(s)'].isin()
+    
