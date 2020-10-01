@@ -182,7 +182,7 @@ def switch_mode(x_var, config):
             reverse = 'Amp'
             units = 'μA'
         values = df.index.get_level_values(f'Ref {reverse}')
-        grouped = df.groupby(level=f'Ref {reverse}')['id']
+        grouped = df.groupby(f'Ref {reverse}')['id']
 
     counts = grouped.agg('count').drop(0)
     filtered_counts = counts[counts > 5]
@@ -225,6 +225,8 @@ def display_const_value(const_val, mode):
      Input('symbol', 'value')]
 )
 def update_figs(date_range, x_var, const_val, config, symbol):
+    # groups = ['Monkey', symbol]
+    groups = 'Monkey'
     df = filter_curves(
         date_range=date_range,
         x_var=x_var,
@@ -244,7 +246,8 @@ def update_figs(date_range, x_var, const_val, config, symbol):
         thresh_fig = {}
     if len(discrim_df.index) > 0:
         weber_vis = {'display': 'block'}
-        weber_fig = plot.weber(discrim_df, x_var, symbols=symbol)
+        weber_fig = plot.weber(discrim_df, x_var)
+        print('called')
     else:
         weber_vis = {'display': 'none'}
         weber_fig = {}
@@ -252,7 +255,7 @@ def update_figs(date_range, x_var, const_val, config, symbol):
         thresh_vis = {'display': 'none'}
         thresh_fig = {}
         weber_vis = {'display': 'block'}
-        weber_fig = plot.weber(discrim_df, 'Current', symbols=symbol)
+        weber_fig = plot.weber(discrim_df, 'Current', groups=groups)
 
     return weber_fig, thresh_fig, weber_vis, thresh_vis
 

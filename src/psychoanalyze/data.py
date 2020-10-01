@@ -129,28 +129,15 @@ def sort_channel_labels(df):
     return df
 
 
-def regress(df, param='Ref Amp', fit_intercept=True):
+def regress(group, fit_intercept=True):
+    group = group.dropna(subset=['x', 'location'])
+    x = group['x'].values.reshape(-1, 1).tolist()
+    y = group['location'].values.tolist()
+    regression = LinReg(fit_intercept=fit_intercept).fit(x, y)
+    slope = regression.coef_[0]
+    intercept = regression.intercept_
 
-    x = df.index.values.reshape(-1, 1).tolist()
-    y = df['mean'].values.tolist()
-    n = df['count'].values.tolist()
-    regressor = LinReg(fit_intercept=fit_intercept).fit(x, y, n)
-    return x, regressor
-
-
-def regress_groups(df, groups):
-    # TODO: groupby + apply
-    monkeys = df.index.unique(level='Monkey').values
-    regressions = {}
-    for monkey in monkeys:
-        x, regression = regress(df.loc[monkey])
-        regressions[monkey] = {
-            'x': [i[0] for i in x],
-            'y': regression.predict(x).tolist(),
-            'slope': regression.coef_[0],
-            'intercept': regression.intercept_
-        }
-    return regressions
+    return pd.Series({'slope': slope, 'intercept': intercept})
 
 
 def fit_curve(curve):

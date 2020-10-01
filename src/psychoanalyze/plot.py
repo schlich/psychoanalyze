@@ -75,24 +75,13 @@ def threshold_v_time(df, export_path=None, stimulus_dimension='Amp'):
     return fig
 
 
-def weber(df, x_var, symbols=None):
-    if symbols == 'None':
-        symbols = None
-    df = df[df['Experiment Type'] == 'Discrimination']
+def weber(curves, x_var, groups=['Monkey']):
     if x_var == 'Curr':
         x = 'Ref Current'
     else:
         x = f'Ref {x_var}'
-    groups = ['Monkey', x]
-    if symbols:
-        groups.append(symbols)
-    summary = df.groupby(groups)['location'] \
+    summary = curves.groupby(groups + [x])['location'] \
         .agg(['mean', 'std', 'count'])
-    # indices = df.groupby(groups).apply(lambda x: x.index.tolist()) \
-    #     .to_frame(name='indices')
-    # data = summary.join(indices)
-    # print(summary.reset_index()['Ref Amp'].dtype)
-    # print(data.columns)
     fig = px.scatter(
         summary.reset_index(),
         x=x,
@@ -100,22 +89,34 @@ def weber(df, x_var, symbols=None):
         error_y='std',
         size='count',
         color='Monkey',
-        symbol=symbols,
         custom_data=['Monkey', x],
         template=template,
         symbol_map=symbol_map
     )
-    regressions = data.regress_groups(summary, groups)
-    for monkey in regressions.keys():
-        x = regressions[monkey]['x']
-        y = regressions[monkey]['y']
-        fig.add_scatter(
-            x=x,
-            y=y,
-            mode='lines',
-            showlegend=False,
-            marker_color=colormap[monkey]
-        )
+
+    curves = curves.reset_index(level=x).rename(columns={x: 'x'})
+    regressions = curves.groupby(groups).apply(data.regress)
+    regressions = regressions.join(curves['x'])
+    regressions['y'] = regressions['slope']*regressions['x'] + regressions['intercept']
+    regressions_fig = px.line(
+        regressions.reset_index(),
+        x='x',
+        y='y',
+        color='Monkey',
+    )
+    # for monkey in regressions.keys():
+    #     x = regressions[]
+    #     y = regressions[monkey]['y']
+    #     fig.add_scatter(
+    #         x=x,
+    #         y=y,
+    #         mode='lines',
+    #         showlegend=False,
+    #         color=colormap[monkey]
+    #     )
+    for trace in regressions_fig.data:
+        fig.add_trace(trace)
+
     fig.update_layout(yaxis_title='Mean Difference Threshold (nC)')
     fig.update_layout(xaxis_title='Ref Charge (nC)')
     return fig
