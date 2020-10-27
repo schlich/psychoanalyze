@@ -1,10 +1,18 @@
-# -*- coding: utf-8 -*-
-"""
-    Dummy conftest.py for psychoanalyze.
+import pytest
+from tdda.referencetest import referencepytest, tag
 
-    If you don't know what this is for, just leave it empty.
-    Read more about conftest.py under:
-    https://pytest.org/latest/plugins.html
-"""
 
-# import pytest
+def pytest_addoption(parser):
+    referencepytest.addoption(parser)
+
+
+def pytest_collection_modifyitems(session, config, items):
+    referencepytest.tagged(config, items)
+
+
+@pytest.fixture(scope="module")
+def ref(request):
+    return referencepytest.ref(request)
+
+
+referencepytest.set_default_data_location("testdata")

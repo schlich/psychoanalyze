@@ -1,5 +1,17 @@
 {
     "python.linting.pylintEnabled": false,
     "python.linting.flake8Enabled": true,
-    "python.linting.enabled": true
+    "python.linting.enabled": true,
+    "python.formatting.provider": "black",
+    "python.venvPath": "~/.cache/pypoetry/virtualenvs",
+    "python.pythonPath": "/home/tyler/.cache/pypoetry/virtualenvs/psychoanalyze-Jj9wTL_R-py3.8/bin/python",
+    "python.testing.pytestArgs": [
+        "tests"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.nosetestsEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=88",
+    ],
 }

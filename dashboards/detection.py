@@ -53,7 +53,7 @@ app.layout = html.Div([
                 options=[
                     {'label': ' Pulse Width', 'value': 'PW'},
                     {'label': ' Amplitude', 'value': 'Amp'},
-                    {'label': ' Charge (per pulse)', 'value': 'Curr'}
+                    {'label': ' Charge (per pulse)', 'value': 'Charge'}
                 ],
                 value='Amp',
                 id='x_var',
@@ -125,7 +125,7 @@ def filter_curves(**filters):
     curves_sessions = curves.join(sessions).reorder_levels(curves.index.names)
     data = curves_sessions[curves_sessions['Days'].between(
         filters['date_range'][0], filters['date_range'][1])]
-    if filters['x_var'] != 'Curr':
+    if filters['x_var'] != 'Charge':
         data = data[data['X dimension'] == filters['x_var']]
         data = data[data['base'] == filters['const_val']]
     data = data[data['Electrode Config'] == filters['config']]
@@ -140,7 +140,7 @@ def get_index_slice(trigger, x_var, monkey, x_val):
             return pd.IndexSlice[monkey, :, :, x_val, :, :, :]
         elif x_var == 'Amp':
             return pd.IndexSlice[monkey, :, x_val, :, :, :, :]
-        elif x_var == 'Curr':
+        elif x_var == 'Charge':
             return pd.IndexSlice[monkey, :, :, :, :, :, :]
 
 
@@ -169,11 +169,14 @@ def select_data(df, selected_data, trigger, x_var):
 )
 def switch_mode(x_var, config):
     df = curves[curves['Electrode Config'] == config]
-    if x_var == 'Curr':
-        reverse = 'Current'
+    if x_var == 'Charge':
+        ref_amps = df.index.get_level_values('Ref Amp')
+        ref_pws = df.index.get_level_values('Ref PW')
+        df['Ref Charge'] = ref_amps*ref_pws / 1000
+        reverse = 'Charge'
         units = 'nC'
-        values = df['Ref Current']
-        grouped = df.groupby('Ref Current')['id']
+        values = df['Ref Charge']
+        grouped = df.groupby('Ref Charge')['id']
     else:
         if x_var == 'Amp':
             reverse = 'PW'
@@ -208,15 +211,13 @@ def display_const_value(const_val, mode):
         units = 'μA'
     elif mode == 'Amp':
         units = 'μs'
-    elif mode == 'Curr':
+    elif mode == 'Charge':
         units = 'nc'
     return 'Value: ' + str(const_val) + ' ' + units
 
 
 @app.callback(
-    [Output('weber', 'figure'),
-     Output('threshold', 'figure'),
-     Output('weber', 'style'),
+    [Output('threshold', 'figure'),
      Output('threshold', 'style')],
     [Input('date-range', 'value'),
      Input('x_var', 'value'),
@@ -224,9 +225,8 @@ def display_const_value(const_val, mode):
      Input('electrode-config', 'value'),
      Input('symbol', 'value')]
 )
-def update_figs(date_range, x_var, const_val, config, symbol):
+def update_detection_fig(date_range, x_var, const_val, config, symbol):
     # groups = ['Monkey', symbol]
-    groups = 'Monkey'
     df = filter_curves(
         date_range=date_range,
         x_var=x_var,
@@ -234,7 +234,6 @@ def update_figs(date_range, x_var, const_val, config, symbol):
         config=config,
     )
     detection_df = df[df['Experiment Type'] == 'Detection']
-    discrim_df = df[df['Experiment Type'] == 'Discrimination']
     if len(detection_df.index) > 0:
         thresh_vis = {'display': 'block'}
         thresh_fig = plot.threshold_v_time(
@@ -244,20 +243,49 @@ def update_figs(date_range, x_var, const_val, config, symbol):
     else:
         thresh_vis = {'display': 'none'}
         thresh_fig = {}
-    if len(discrim_df.index) > 0:
-        weber_vis = {'display': 'block'}
-        weber_fig = plot.weber(discrim_df, x_var)
-        print('called')
-    else:
-        weber_vis = {'display': 'none'}
-        weber_fig = {}
     if x_var == 'Curr':
         thresh_vis = {'display': 'none'}
         thresh_fig = {}
-        weber_vis = {'display': 'block'}
-        weber_fig = plot.weber(discrim_df, 'Current', groups=groups)
 
-    return weber_fig, thresh_fig, weber_vis, thresh_vis
+    return thresh_fig, thresh_vis
+
+
+@app.callback(
+    [Output('weber', 'figure'),
+     Output('weber', 'style'),],
+    [Input('date-range', 'value'),
+     Input('x_var', 'value'),
+     Input('const', 'value'),
+     Input('electrode-config', 'value'),
+     Input('symbol', 'value')]
+)
+def update_discrim_fig(date_range, x_var, const_val, config, symbol):
+    groups = ['Monkey']
+    if symbol != 'None':
+        groups.append(symbol)
+    print(groups)
+    df = filter_curves(
+        date_range=date_range,
+        x_var=x_var,
+        const_val=const_val,
+        config=config,
+    )
+    if x_var in ['Amp', 'PW']:
+        df['Ref X'] = df.index.get_level_values(f'Ref {x_var}')
+    elif x_var == 'Charge':
+        ref_amps = df.index.get_level_values('Ref Amp')
+        ref_pws = df.index.get_level_values('Ref PW')
+        df['Ref X'] = ref_amps*ref_pws / 1000
+    discrim_df = df[df['Experiment Type'] == 'Discrimination']
+    if len(discrim_df.index) > 0:
+        weber_vis = {'display': 'block'}
+        weber_fig = plot.weber(discrim_df, groups=groups)
+    else:
+        weber_vis = {'display': 'none'}
+        weber_fig = {}
+
+    return weber_fig, weber_vis
+
 
 
 @app.callback(

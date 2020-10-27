@@ -5,7 +5,7 @@ description = ""
 authors = ["Tyler Schlichenmeyer <tyler.schlichenmeyer@gmail.com>"]
 
 [tool.poetry.dependencies]
-python = "3.8.3"
+python = "3.8.6"
 jupyterlab = "^2.1.4"
 plotly = "^4.8.1"
 pandas = "^1.0.4"
@@ -15,13 +15,16 @@ psutil = "^5.7.0"
 requests = "^2.23.0"
 tqdm = "^4.47.0"
 panel = "^0.9.7"
-bokeh = "^2.1.1"
 hvplot = "^0.6.0"
 dash = "^1.14.0"
 tables = "^3.6.1"
 dash-bootstrap-components = "^0.10.5"
+psignifit = {git = "https://github.com/wichmann-lab/python-psignifit.git"}
+pandas-flavor = "^0.2.0"
 
 [tool.poetry.dev-dependencies]
-pytest = "^3.4"
 pylint = "^2.5.3"
-flake8 = "^3.8.3"
+black = {version = "^20.8b1", allow-prereleases = true}
+pytest = "^6.1.1"
+flake8 = "^3.8.4"
+tdda = "^1.0.31"
