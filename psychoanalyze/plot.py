@@ -13,7 +13,7 @@ sessions = data.load("sessions")
 points = data.load("points")
 
 impedances = pd.read_csv(
-    "../data/2-calculated/impedances.csv",
+    "data/2-calculated/impedances.csv",
     parse_dates=["Date"],
     dtype={"Channel(s)": str},
 ).sort_values("Days")
@@ -93,38 +93,39 @@ def threshold_v_time(df, export_path=None, stimulus_dimension="Amp"):
     return fig
 
 
-def weber(curves, groups=["Monkey"]):
-    summary = curves.groupby(groups + ["Ref X"])["location"].agg(
+def weber(curves, x_var="Ref Charge", color="Monkey", symbol="Channel(s)"):
+    curves["Ref Charge"] = curves.curve.X_q
+    summary = curves.groupby([color, symbol, x_var])["location"].agg(
         ["mean", "std", "count"]
     )
     fig = px.scatter(
         summary.reset_index(),
-        x="Ref X",
+        x=x_var,
         y="mean",
         error_y="std",
         size="count",
-        color="Monkey",
-        symbol=groups[-1],
-        custom_data=["Monkey", "Ref X"],
+        color=color,
+        symbol=symbol,
+        # custom_data=["Monkey", "Ref X"],
         template=template,
         symbol_map=symbol_map,
     )
-    regressions = curves.groupby(groups).apply(data.regress)
+    regressions = curves.groupby([color, symbol, x_var]).apply(data.regress)
     if isinstance(regressions, pd.Series):
         regressions = regressions.to_frame()
-    ref = curves["Ref X"].to_frame()
+    ref = curves[x_var].to_frame()
     # print(ref.index.names)
     regressions = regressions.join(ref)
     # print(regressions.index.names)
     m = regressions["slope"]
     b = regressions["intercept"]
-    regressions["y"] = m * regressions["Ref X"] + b
+    regressions["y"] = m * regressions[x_var] + b
     regressions_fig = px.line(
         regressions.reset_index(),
-        x="Ref X",
+        x=x_var,
         y="y",
         color="Monkey",
-        line_group=groups[-1],
+        # line_group=groups[-1],
     )
     # for monkey in regressions.keys():
     #     x = regressions[]

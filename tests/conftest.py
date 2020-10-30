@@ -1,5 +1,6 @@
 import pytest
 from tdda.referencetest import referencepytest, tag
+from selenium.webdriver import FirefoxOptions
 
 
 def pytest_addoption(parser):
@@ -16,3 +17,9 @@ def ref(request):
 
 
 referencepytest.set_default_data_location("testdata")
+
+
+def pytest_setup_options():
+    options = FirefoxOptions()
+    options.add_argument("--headless")
+    return options

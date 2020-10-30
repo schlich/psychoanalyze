@@ -66,10 +66,29 @@ outliers = {
 }
 
 
+class DaysFilter:
+    def __init__(self, start, stop):
+        self.start = start
+        self.stop = stop
+
+    def filter(self, df):
+        # return df
+        return df[df["Days"].between(self.start, self.stop)]
+
+
+# class FilterCollection:
+#     def __init__(self, filters):
+#         self.filters = filters
+
+#     def filter(self, df):
+#         for f in self.filters:
+#             df = f.filter(df)
+
+
 def load(name=None, outliers=outliers):
     # set outliers=None to restore full unfiltered data set
     def read_data(name):
-        df = pd.read_hdf("../data/2-calculated.h5", name)
+        df = pd.read_hdf("data/2-calculated.h5", name)
         if outliers:
             df = df.drop(outliers[name])
         return df
@@ -84,29 +103,33 @@ def load(name=None, outliers=outliers):
         return df
 
 
-def filter(df, experiment_type=None, electrode_config=None, ranges={}, values={}):
-    # TODO: implement ranges gt or lt single number
-    def filter_ranges(df, ranges):
-        for param, bounds in ranges.items():
-            df = df[df[param].between(bounds[0], bounds[1])]
-        return df
-
-    def filter_values(df, lists):
-        for param, value in lists.items():
-            if not (isinstance(value, list) | (isinstance(value, tuple))):
-                value = [value]
-            df = df[df[param].isin(value)]
-        return df
-
-    if ranges:
-        df = filter_ranges(df, ranges)
-    if values:
-        df = filter_values(df, values)
-    if experiment_type == "discrimination":
-        df = df[df["Ref Amp"] != 0 & (df["Ref PW"] > 5)]
-    elif experiment_type == "detection":
-        df = df[(df["Ref Amp"] < 5) | (df["Ref PW"] < 5)]
+# def filter(df, experiment_type=None, electrode_config=None, ranges={}, values={}):
+def filter(df, filters):
+    for f in filters:
+        daysfilter = DaysFilter(f[0], f[1])
+        df = daysfilter.filter(df)
     return df
+    # def filter_ranges(df, ranges):
+    #     for param, bounds in ranges.items():
+    #         df = df[df[param].between(bounds[0], bounds[1])]
+    #     return df
+
+    # def filter_values(df, lists):
+    #     for param, value in lists.items():
+    #         if not (isinstance(value, list) | (isinstance(value, tuple))):
+    #             value = [value]
+    #         df = df[df[param].isin(value)]
+    #     return df
+
+    # if ranges:
+    #     df = filter_ranges(df, ranges)
+    # if values:
+    #     df = filter_values(df, values)
+    # if experiment_type == "discrimination":
+    #     df = df[df["Ref Amp"] != 0 & (df["Ref PW"] > 5)]
+    # elif experiment_type == "detection":
+    #     df = df[(df["Ref Amp"] < 5) | (df["Ref PW"] < 5)]
+    # return df
 
 
 def remove_outliers(df, identifier, ids):
@@ -252,6 +275,11 @@ class CurveAccessor:
     @property
     def X(self):
         return self._obj.index.get_level_values(f"Ref {self.ind_var}")
+
+    def X_q(self):
+        amps = self._obj.index.get_level_values("Ref Amp")
+        pws = self._obj.index.get_level_values("Ref PW")
+        return amps * pws / 1000
 
     def polarity(curve_series):
         pass
