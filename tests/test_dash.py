@@ -5,15 +5,21 @@ from dash.testing.application_runners import import_app
 
 
 def test_001_dash(dash_duo):
+    # load app
     app = import_app("dashboards.data_app")
     dash_duo.start_server(app)
-    # # close out of modal disclaimer
+
+    # when the app loads, no filters exist
     filters = dash_duo.find_elements(".filter")
     assert len(filters) == 0
+
+    # the user can click a button to add a filter
     dash_duo.multiple_click("#add-filter", 1)
-    dash_duo.wait_for_element("#range-slider-1")
+
+    # a filter appears, bringing the total number of filters to 1S
     filters = dash_duo.find_elements(".filter")
     assert len(filters) == 1
+
     # dash_duo.multiple_click("#remove-filter-1", 1)
     # filters = dash_duo.find_elements(".filter")
     # assert len(filters) == 0

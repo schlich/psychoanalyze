@@ -250,7 +250,6 @@ def select_data(df, selected_data, trigger, x_var):
 )
 def update_detection_fig(filters):
     # groups = ['Monkey', symbol]
-    print("called")
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
     df = data.filter(detection_df, filters)
@@ -351,15 +350,16 @@ def update_filters(n_clicks, remove_clicks, children):
         if triggered == "add-filter.n_clicks":
             new_filter = html.Div(
                 [
-                    dcc.RangeSlider(
-                        id={"type": "date-filter", "index": n_clicks},
-                        min=0,
-                        max=max_date,
-                        step=1,
-                        value=[0, max_date],
-                        marks={0: "0", 711: "711"},
-                        # tooltip={'always_visible': True}
+                    html.H4("Filter type:"),
+                    dcc.Dropdown(
+                        id={"type": "filter-type-dropdown", "index": n_clicks},
+                        options=[
+                            {"label": "Date Range", "value": "date-range"},
+                            {"label": "Stimulus Dimension", "value": "stim-dim"},
+                            {"label": "Constant Value", "value": "const-val"},
+                        ],
                     ),
+                    html.Div(id={"type": "data-selector", "index": n_clicks}),
                     dbc.Button(
                         "Remove Filter", id={"type": "remove_btn", "index": n_clicks}
                     ),
@@ -371,6 +371,28 @@ def update_filters(n_clicks, remove_clicks, children):
         else:
             del children[remove_clicks.index(1)]
     return children
+
+
+@app.callback(
+    Output({"type": "data-selector", "index": MATCH}, "children"),
+    [
+        Input({"type": "filter-type-dropdown", "index": MATCH}, "value"),
+        Input("add-filter", "n_clicks"),
+    ],
+)
+def assign_data_selector(filter_type, n_clicks):
+    if filter_type == "date-range":
+        return [
+            dcc.RangeSlider(
+                id={"type": "date-filter", "index": n_clicks},
+                min=0,
+                max=max_date,
+                step=1,
+                value=[0, max_date],
+                marks={0: "0", 711: "711"},
+                tooltip={"always_visible": True},
+            )
+        ]
 
 
 if __name__ == "__main__":
