@@ -34,7 +34,7 @@ def test_no_filters():
 
 def test_filter_days():
     assert len(df["Days"]) > 0
-    filter = data.DaysFilter(100, 200)
-    filtered_data = data.filter(df, [filter])
+    filter = data.RangeFilter(100, 200, "Days")
+    filtered_data = df.curve.filter([filter])
     assert filtered_data["Days"].min() >= filter.start
     assert filtered_data["Days"].max() <= filter.stop

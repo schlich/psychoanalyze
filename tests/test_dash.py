@@ -1,7 +1,14 @@
+import re
 import dash
 import time
 import dash_html_components as html
 from dash.testing.application_runners import import_app
+
+
+def css_escape(s):
+    sel = re.sub("[\\{\\}\\\"\\'.:,]", lambda m: "\\" + m.group(0), s)
+    print(sel)
+    return sel
 
 
 def test_001_dash(dash_duo):
@@ -16,9 +23,11 @@ def test_001_dash(dash_duo):
     # the user can click a button to add a filter
     dash_duo.multiple_click("#add-filter", 1)
 
-    # a filter appears, bringing the total number of filters to 1S
+    # a filter appears, bringing the total number of filters to 1
     filters = dash_duo.find_elements(".filter")
     assert len(filters) == 1
+
+    # the user notices he can change the filter type with a dropdown menu
 
     # dash_duo.multiple_click("#remove-filter-1", 1)
     # filters = dash_duo.find_elements(".filter")

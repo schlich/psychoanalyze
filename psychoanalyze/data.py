@@ -66,14 +66,15 @@ outliers = {
 }
 
 
-class DaysFilter:
-    def __init__(self, start, stop):
+class RangeFilter:
+    def __init__(self, start, stop, column):
         self.start = start
         self.stop = stop
+        self.column = column
 
     def filter(self, df):
         # return df
-        return df[df["Days"].between(self.start, self.stop)]
+        return df[df[self.column].between(self.start, self.stop)]
 
 
 # class FilterCollection:
@@ -104,9 +105,9 @@ def load(name=None, outliers=outliers):
 
 
 # def filter(df, experiment_type=None, electrode_config=None, ranges={}, values={}):
-def filter(df, filters):
+def filter_all(df, filters):
     for f in filters:
-        daysfilter = DaysFilter(f[0], f[1])
+        daysfilter = RangeFilter(f[0], f[1])
         df = daysfilter.filter(df)
     return df
     # def filter_ranges(df, ranges):
@@ -284,5 +285,10 @@ class CurveAccessor:
     def polarity(curve_series):
         pass
 
+    def filter(self, filters):
+        df = self._obj
+        for f in filters:
+            df = f.filter(df)
+        return df
 
-#     if curve_series['Channel(s)'].isin()
+    # if curve_series['Channel(s)'].isin()

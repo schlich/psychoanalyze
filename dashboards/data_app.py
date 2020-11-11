@@ -32,37 +32,14 @@ app.layout = html.Div(
     [
         html.H1("PsychoAnalyze"),
         dbc.Button("Add Filter", id="add-filter", n_clicks=0),
-        html.Div(id="filter-container", children=[]),
+        dbc.Row(id="filter-container", children=[]),
         html.P(id="remove-btn-output"),
         # dbc.Row(
         #     [
         #         dbc.Col(
         #             [
-        #                 html.H4("Date Range:"),
-        #                 dcc.RangeSlider(
-        #                     id={"type": "filter", "id": "date-range"},
-        #                     min=0,
-        #                     max=max_date,
-        #                     step=1,
-        #                     value=[0, max_date],
-        #                     marks={0: "0", 711: "711"},
-        #                     # tooltip={'always_visible': True}
-        #                 ),
-        #             ]
-        #         ),
-        #         dbc.Col(
-        #             [
         #                 html.H4("Method/Variable"),
-        #                 dcc.RadioItems(
-        #                     options=[
-        #                         {"label": " Pulse Width", "value": "PW"},
-        #                         {"label": " Amplitude", "value": "Amp"},
-        #                         {"label": " Charge (per pulse)", "value": "Charge"},
-        #                     ],
-        #                     value="Amp",
-        #                     id={"type": "filter", "id": "x_var"},
-        #                     labelStyle={"display": "block"},
-        #                 ),
+        #
         #             ]
         #         ),
         #         dbc.Col(
@@ -252,7 +229,7 @@ def update_detection_fig(filters):
     # groups = ['Monkey', symbol]
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
-    df = data.filter(detection_df, filters)
+    df = detection_df.curve.filter(filters)
     thresh_fig = plot.threshold_v_time(df)
 
     return thresh_fig
@@ -323,17 +300,6 @@ def update_detection_fig(filters):
 #     return fig, json.dumps(weber_data, indent=2), psy_curves_div
 
 
-# @app.callback(
-#     Output({"type": "filter", "index": MATCH}, "children"),
-#     [Input({"type": "remove_btn", "index": MATCH}, "n_clicks")],
-#     [State({"type": "filter", "index": MATCH}, "children")],
-# )
-# def remove_filter(n_clicks, children):
-#     if n_clicks:
-#         return []
-#     return children
-
-
 @app.callback(
     Output("filter-container", "children"),
     [
@@ -348,24 +314,28 @@ def update_filters(n_clicks, remove_clicks, children):
     triggered = dash.callback_context.triggered[0]["prop_id"]
     if n_clicks:
         if triggered == "add-filter.n_clicks":
-            new_filter = html.Div(
-                [
-                    html.H4("Filter type:"),
-                    dcc.Dropdown(
-                        id={"type": "filter-type-dropdown", "index": n_clicks},
-                        options=[
-                            {"label": "Date Range", "value": "date-range"},
-                            {"label": "Stimulus Dimension", "value": "stim-dim"},
-                            {"label": "Constant Value", "value": "const-val"},
-                        ],
-                    ),
-                    html.Div(id={"type": "data-selector", "index": n_clicks}),
-                    dbc.Button(
-                        "Remove Filter", id={"type": "remove_btn", "index": n_clicks}
-                    ),
-                ],
-                id={"type": "filter", "index": n_clicks},
-                className="filter",
+            new_filter = dbc.Col(
+                dbc.Card(
+                    [
+                        html.H6("Filter type:"),
+                        dcc.Dropdown(
+                            id={"type": "filter-type-dropdown", "index": n_clicks},
+                            options=[
+                                {"label": "Date Range", "value": "date-range"},
+                                {"label": "Stimulus Dimension", "value": "stim-dim"},
+                                {"label": "Constant Value", "value": "const-val"},
+                            ],
+                        ),
+                        html.Div(id={"type": "data-selector", "index": n_clicks}),
+                        dbc.Button(
+                            "Remove Filter",
+                            id={"type": "remove_btn", "index": n_clicks},
+                        ),
+                    ],
+                    id={"type": "filter", "index": n_clicks},
+                    className="filter",
+                    style={"width": "18rem"},
+                )
             )
             children.append(new_filter)
         else:
@@ -393,6 +363,17 @@ def assign_data_selector(filter_type, n_clicks):
                 tooltip={"always_visible": True},
             )
         ]
+    elif filter_type == "stim-dim":
+        return dcc.RadioItems(
+            options=[
+                {"label": " Pulse Width", "value": "PW"},
+                {"label": " Amplitude", "value": "Amp"},
+                {"label": " Charge (per pulse)", "value": "Charge"},
+            ],
+            value="Amp",
+            id={"type": "filter", "id": "x_var"},
+            labelStyle={"display": "block"},
+        )
 
 
 if __name__ == "__main__":
