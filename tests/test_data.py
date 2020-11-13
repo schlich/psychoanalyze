@@ -1,6 +1,6 @@
 import pandas as pd
 import unittest
-from psychoanalyze import data
+from psychoanalyze import data, plot
 from tdda.referencetest import referencepytest as ref
 
 assertions = unittest.TestCase("__init__")
@@ -17,10 +17,10 @@ all_sessions = data.load("sessions")
 df = all_sessions.join(all_curves)
 
 
-def test_regress_group_return_series():
-    regression = data.regress(group)
-    assertions.assertAlmostEqual(regression["slope"], 1)
-    assertions.assertAlmostEqual(regression["intercept"], 0)
+# def test_regress_group_return_series():
+#     regression = data.regress(group)
+#     assertions.assertAlmostEqual(regression["slope"], 1)
+#     assertions.assertAlmostEqual(regression["intercept"], 0)
 
 
 def test_curve_accessor_find_X():
@@ -38,3 +38,12 @@ def test_filter_days():
     filtered_data = df.curve.filter([filter])
     assert filtered_data["Days"].min() >= filter.start
     assert filtered_data["Days"].max() <= filter.stop
+
+
+# def test_regression_data_has_X_column():
+
+
+def test_weber_input_contains_data():
+    discrim_df = df[df["Experiment Type"] == "Discrimination"]
+    fig = plot.weber(discrim_df)
+    print(fig)

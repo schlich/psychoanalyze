@@ -8,15 +8,15 @@ from scipy.special import erfc, erfcinv
 
 thresh_percent = 0.5
 
-curves = data.load("curves")
-sessions = data.load("sessions")
-points = data.load("points")
+# curves = data.load("curves")
+# sessions = data.load("sessions")
+# points = data.load("points")
 
-impedances = pd.read_csv(
-    "data/2-calculated/impedances.csv",
-    parse_dates=["Date"],
-    dtype={"Channel(s)": str},
-).sort_values("Days")
+# impedances = pd.read_csv(
+#     "data/2-calculated/impedances.csv",
+#     parse_dates=["Date"],
+#     dtype={"Channel(s)": str},
+# ).sort_values("Days")
 
 axis_settings = {
     "ticks": "outside",
@@ -93,8 +93,13 @@ def threshold_v_time(df, export_path=None, stimulus_dimension="Amp"):
     return fig
 
 
+# def weber(discrim_df):
+
+#     return px.scatter()
+
+
 def weber(curves, x_var="Ref Charge", color="Monkey", symbol="Channel(s)"):
-    curves["Ref Charge"] = curves.curve.X_q
+    curves["Ref Charge"] = curves.curve.X_q()
     summary = curves.groupby([color, symbol, x_var])["location"].agg(
         ["mean", "std", "count"]
     )
@@ -110,38 +115,38 @@ def weber(curves, x_var="Ref Charge", color="Monkey", symbol="Channel(s)"):
         template=template,
         symbol_map=symbol_map,
     )
-    regressions = curves.groupby([color, symbol, x_var]).apply(data.regress)
-    if isinstance(regressions, pd.Series):
-        regressions = regressions.to_frame()
-    ref = curves[x_var].to_frame()
-    # print(ref.index.names)
-    regressions = regressions.join(ref)
-    # print(regressions.index.names)
-    m = regressions["slope"]
-    b = regressions["intercept"]
-    regressions["y"] = m * regressions[x_var] + b
-    regressions_fig = px.line(
-        regressions.reset_index(),
-        x=x_var,
-        y="y",
-        color="Monkey",
-        # line_group=groups[-1],
-    )
-    # for monkey in regressions.keys():
-    #     x = regressions[]
-    #     y = regressions[monkey]['y']
-    #     fig.add_scatter(
-    #         x=x,
-    #         y=y,
-    #         mode='lines',
-    #         showlegend=False,
-    #         color=colormap[monkey]
-    #     )
-    for trace in regressions_fig.data:
-        fig.add_trace(trace)
+    # regressions = curves.groupby([color, symbol, x_var]).apply(data.regress)
+    # if isinstance(regressions, pd.Series):
+    #     regressions = regressions.to_frame()
+    # ref = curves[x_var].to_frame()
+    # # print(ref.index.names)
+    # regressions = regressions.join(ref)
+    # # print(regressions.index.names)
+    # m = regressions["slope"]
+    # b = regressions["intercept"]
+    # regressions["y"] = m * regressions[x_var] + b
+    # regressions_fig = px.line(
+    #     regressions.reset_index(),
+    #     x=x_var,
+    #     y="y",
+    #     color="Monkey",
+    #     # line_group=groups[-1],
+    # )
+    # # for monkey in regressions.keys():
+    # #     x = regressions[]
+    # #     y = regressions[monkey]['y']
+    # #     fig.add_scatter(
+    # #         x=x,
+    # #         y=y,
+    # #         mode='lines',
+    # #         showlegend=False,
+    # #         color=colormap[monkey]
+    # #     )
+    # for trace in regressions_fig.data:
+    #     fig.add_trace(trace)
 
-    # fig.update_layout(yaxis_title='Mean Difference Threshold (nC)')
-    # fig.update_layout(xaxis_title='Ref Charge (nC)')
+    # # fig.update_layout(yaxis_title='Mean Difference Threshold (nC)')
+    # # fig.update_layout(xaxis_title='Ref Charge (nC)')
     return fig
 
 

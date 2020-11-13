@@ -67,14 +67,13 @@ outliers = {
 
 
 class RangeFilter:
-    def __init__(self, start, stop, column):
-        self.start = start
-        self.stop = stop
-        self.column = column
+    def __init__(self, range, variable):
+        self.range = range
+        self.variable = variable
 
     def filter(self, df):
         # return df
-        return df[df[self.column].between(self.start, self.stop)]
+        return df[df[self.variable].between(self.range[0], self.range[1])]
 
 
 # class FilterCollection:
@@ -196,18 +195,8 @@ def sort_channel_labels(df):
     return df
 
 
-# def regress(group, fit_intercept=True):
-#     group = group.dropna(subset=["Ref X", "location"])
-#     x = group["Ref X"].values.reshape(-1, 1).tolist()
-#     y = group["location"].values.tolist()
-#     regression = LinReg(fit_intercept=fit_intercept).fit(x, y)
-#     slope = regression.coef_[0]
-#     intercept = regression.intercept_
-#     return pd.Series({"slope": slope, "intercept": intercept})
-
-
 def regress(group):
-    regression = LinReg().fit(group["X"].to_frame(), group["y"])
+    regression = LinReg().fit(group.curve.X, group["y"])
     params = {"slope": regression.coef_[0], "intercept": regression.intercept_}
     return pd.Series(params)
 
@@ -252,7 +241,7 @@ class CurveAccessor:
     def _validate(obj):
         if "Ref Amp" not in obj.index.names or "Ref PW" not in obj.index.names:
             raise AttributeError(
-                "Must pass a DataFrame with Ref Amp and Ref PW columns"
+                "Must pass a DataFrame with Ref Amp and Ref PW indexes"
             )
         if len(obj.index) < 3:
             raise AttributeError("Not enough data points")
@@ -263,9 +252,7 @@ class CurveAccessor:
         n_refamp_vals = len(df.index.get_level_values("Ref Amp").unique())
         n_refpw_vals = len(df.index.get_level_values("Ref PW").unique())
         if (n_refamp_vals > 1) and (n_refpw_vals > 1):
-            raise AttributeError(
-                "PsychoAnalyze does not yet support multi dimensional analysis"
-            )
+            raise AttributeError("Multiple values for both ref amp and ref pw")
         elif n_refamp_vals > n_refpw_vals:
             return "Amp"
         elif n_refamp_vals < n_refpw_vals:

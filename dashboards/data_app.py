@@ -224,34 +224,41 @@ def select_data(df, selected_data, trigger, x_var):
         Input({"type": "date-filter", "index": ALL}, "value"),
         # Input("symbol", "value"),
     ],
+    [State({"type": "filter-type-dropdown", "index": ALL}, "value")],
 )
-def update_detection_fig(filters):
+def update_detection_fig(filter_values, filter_types):
     # groups = ['Monkey', symbol]
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
+    filters = [data.RangeFilter(values, "Days") for values in filter_values]
     df = detection_df.curve.filter(filters)
     thresh_fig = plot.threshold_v_time(df)
 
     return thresh_fig
 
 
-# @app.callback(
-#     Output("weber", "figure"),
-#     [
-#         # Input("date-range", "value"),
-#         # Input("x_var", "value"),
-#         # Input("const", "value"),
-#         # Input("electrode-config", "value"),
-#         # Input("symbol", "value"),
-#         Input({"type": "filter", "index": ALL}, "value")
-#     ],
-# )
-# def update_discrim_fig(values, color="Monkey", symbol="Channel(s)"):
-#     df = filter_curves(values)
-#     discrim_df = df[df["Experiment Type"] == "Discrimination"]
-#     weber_fig = plot.weber(discrim_df)
+@app.callback(
+    Output("weber", "figure"),
+    [
+        # Input("date-range", "value"),
+        # Input("x_var", "value"),
+        # Input("const", "value"),
+        # Input("electrode-config", "value"),
+        # Input("symbol", "value"),
+        Input({"type": "filter-values", "index": ALL}, "value"),
+    ],
+    [State({"type": "filter-type-dropdown", "index": ALL}, "value")],
+)
+def update_discrim_fig(filter_values, filter_types):
+    df = curves_sessions
+    print(filter_values)
+    discrim_df = df[df["Experiment Type"] == "Discrimination"]
+    filters = [data.RangeFilter(values, "Days") for values in filter_values]
+    discrim_df = discrim_df.curve.filter(filters)
+    weber_fig = plot.weber(discrim_df)
 
-#     return weber_fig
+    return weber_fig
+
 
 #     # @app.callback(
 #     #     [
@@ -354,13 +361,12 @@ def assign_data_selector(filter_type, n_clicks):
     if filter_type == "date-range":
         return [
             dcc.RangeSlider(
-                id={"type": "date-filter", "index": n_clicks},
+                id={"type": "filter-values", "index": n_clicks},
                 min=0,
                 max=max_date,
                 step=1,
                 value=[0, max_date],
                 marks={0: "0", 711: "711"},
-                tooltip={"always_visible": True},
             )
         ]
     elif filter_type == "stim-dim":
@@ -368,10 +374,9 @@ def assign_data_selector(filter_type, n_clicks):
             options=[
                 {"label": " Pulse Width", "value": "PW"},
                 {"label": " Amplitude", "value": "Amp"},
-                {"label": " Charge (per pulse)", "value": "Charge"},
             ],
             value="Amp",
-            id={"type": "filter", "id": "x_var"},
+            id={"type": "filter-values", "index": n_clicks},
             labelStyle={"display": "block"},
         )
 
