@@ -71,12 +71,15 @@ class Filter:
         self.variable = variable
         self.value = value
 
+
+class RangeFilter(Filter):
     def filter(self, df):
-        # return df
-        if type(self.value) == "list":
-            return df[df[self.variable].between(self.value[0], self.value[1])]
-        else:
-            return df[df[self.variable] == self.value]
+        return df[df[self.variable].between(self.value[0], self.value[1])]
+
+
+class ValueFilter(Filter):
+    def filter(self, df):
+        return df[df[self.variable] == self.value]
 
 
 # class FilterCollection:

@@ -34,10 +34,17 @@ def test_no_filters():
 
 def test_filter_days():
     assert len(df["Days"]) > 0
-    filter = data.RangeFilter(100, 200, "Days")
+    filter = data.RangeFilter("Days", [200, 300])
     filtered_data = df.curve.filter([filter])
-    assert filtered_data["Days"].min() >= filter.start
-    assert filtered_data["Days"].max() <= filter.stop
+    assert filtered_data["Days"].min() >= filter.value[0]
+    assert filtered_data["Days"].max() <= filter.value[1]
+
+
+def test_filter_ind_variable():
+    filter = data.ValueFilter("X dimension", "Amp")
+    filtered_data = df.curve.filter([filter])
+    assert "Amp" in filtered_data["X dimension"].to_list()
+    assert "PW" not in filtered_data["X dimension"].to_list()
 
 
 # def test_regression_data_has_X_column():
@@ -46,4 +53,3 @@ def test_filter_days():
 def test_weber_input_contains_data():
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
     fig = plot.weber(discrim_df)
-    print(fig)

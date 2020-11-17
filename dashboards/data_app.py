@@ -253,7 +253,7 @@ def update_discrim_fig(filter_values, filter_types):
     df = curves_sessions
     print(filter_values)
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
-    filters = [data.Filter("Days", value) for value in filter_values]
+    filters = [data.RangeFilter("Days", value) for value in filter_values]
     discrim_df = discrim_df.curve.filter(filters)
     weber_fig = plot.weber(discrim_df)
 
