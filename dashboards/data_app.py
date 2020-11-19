@@ -44,19 +44,6 @@ app.layout = html.Div(
         #         ),
         #         dbc.Col(
         #             [
-        #                 html.H4("Constant variable value:"),
-        #                 dcc.Slider(
-        #                     id="const",
-        #                     min=0,
-        #                     # max=max_const_var,
-        #                     step=None,
-        #                     included=False,
-        #                 ),
-        #                 html.P(id="const-val"),
-        #             ]
-        #         ),
-        #         dbc.Col(
-        #             [
         #                 html.H4("Electrode Configuration:"),
         #                 dcc.RadioItems(
         #                     options=[
@@ -99,19 +86,6 @@ app.layout = html.Div(
             # figure=plot.psycho(curves_sessions[curves_sessions['Days'] == 126]),
             id="psy-curves"
         ),
-        # dbc.Col(
-        #     dt.DataTable(
-        #         id="table",
-        #         columns=[
-        #             {"name": "id", "id": "id"},
-        #             {"name": "Monkey", "id": "Monkey"},
-        #             {"name": "location", "id": "location"},
-        #         ],
-        #         data=curves.reset_index().to_dict("records"),
-        #     ),
-        #     width={"size": 6, "offset": 3},
-        # ),
-        html.Pre(id="selected-output", style=styles["pre"]),
     ]
 )
 
@@ -214,6 +188,13 @@ def select_data(df, selected_data, trigger, x_var):
     return "Value: " + str(const_val) + " " + units
 
 
+def combine_filters(range_filters, value_filters):
+    range_filters = [data.RangeFilter("Days", value) for value in range_filters]
+    value_filters = [data.ValueFilter("X dimension", value) for value in value_filters]
+    all_filters = range_filters + value_filters
+    return all_filters
+
+
 @app.callback(
     Output("threshold", "figure"),
     [
@@ -221,17 +202,17 @@ def select_data(df, selected_data, trigger, x_var):
         # Input("x_var", "value"),
         # Input("const", "value"),
         # Input("electrode-config", "value"),
-        Input({"type": "date-filter", "index": ALL}, "value"),
+        Input({"type": "filter-values", "data-type": "range", "index": ALL}, "value"),
+        Input({"type": "filter-values", "data-type": "value", "index": ALL}, "value"),
         # Input("symbol", "value"),
     ],
-    [State({"type": "filter-type-dropdown", "index": ALL}, "value")],
 )
-def update_detection_fig(filter_values, filter_types):
+def update_detection_fig(range_filters, value_filters):
     # groups = ['Monkey', symbol]
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
-    filters = [data.RangeFilter(values, "Days") for values in filter_values]
-    df = detection_df.curve.filter(filters)
+    all_filters = combine_filters(range_filters, value_filters)
+    df = detection_df.curve.filter(all_filters)
     thresh_fig = plot.threshold_v_time(df)
 
     return thresh_fig
@@ -240,21 +221,18 @@ def update_detection_fig(filter_values, filter_types):
 @app.callback(
     Output("weber", "figure"),
     [
-        # Input("date-range", "value"),
-        # Input("x_var", "value"),
         # Input("const", "value"),
         # Input("electrode-config", "value"),
         # Input("symbol", "value"),
-        Input({"type": "filter-values", "index": ALL}, "value"),
+        Input({"type": "filter-values", "data-type": "range", "index": ALL}, "value"),
+        Input({"type": "filter-values", "data-type": "value", "index": ALL}, "value"),
     ],
-    [State({"type": "filter-type-dropdown", "index": ALL}, "value")],
 )
-def update_discrim_fig(filter_values, filter_types):
+def update_discrim_fig(range_filters, value_filters):
     df = curves_sessions
-    print(filter_values)
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
-    filters = [data.RangeFilter("Days", value) for value in filter_values]
-    discrim_df = discrim_df.curve.filter(filters)
+    all_filters = combine_filters(range_filters, value_filters)
+    discrim_df = discrim_df.curve.filter(all_filters)
     weber_fig = plot.weber(discrim_df)
 
     return weber_fig
@@ -263,7 +241,6 @@ def update_discrim_fig(filter_values, filter_types):
 #     # @app.callback(
 #     #     [
 #     #         Output("psy-curves", "figure"),
-#     #         Output("selected-output", "children"),
 #     #         Output("psy-curves", "style"),
 #     #     ],
 #     #     [
@@ -333,6 +310,18 @@ def update_filters(n_clicks, remove_clicks, children):
                                 {"label": "Constant Value", "value": "const-val"},
                             ],
                         ),
+                        html.H6("Variable:"),
+                        dcc.Dropdown(
+                            id={"type": "variable", "index": n_clicks},
+                            options=[
+                                {"label": "Days from Implantation", "value": "Days"},
+                                {
+                                    "label": "Independent Variable",
+                                    "value": "X dimension",
+                                },
+                                {"label": "Reference Pulse Width", "value": "Ref PW"},
+                            ],
+                        ),
                         html.Div(id={"type": "data-selector", "index": n_clicks}),
                         dbc.Button(
                             "Remove Filter",
@@ -361,7 +350,7 @@ def assign_data_selector(filter_type, n_clicks):
     if filter_type == "date-range":
         return [
             dcc.RangeSlider(
-                id={"type": "filter-values", "index": n_clicks},
+                id={"type": "filter-values", "data-type": "range", "index": n_clicks},
                 min=0,
                 max=max_date,
                 step=1,
@@ -376,8 +365,16 @@ def assign_data_selector(filter_type, n_clicks):
                 {"label": " Amplitude", "value": "Amp"},
             ],
             value="Amp",
-            id={"type": "filter-values", "index": n_clicks},
+            id={"type": "filter-values", "data-type": "value", "index": n_clicks},
             labelStyle={"display": "block"},
+        )
+    elif filter_type == "const-val":
+        return dcc.Slider(
+            id="const",
+            min=0,
+            # max=max_const_var,
+            step=None,
+            included=False,
         )
 
 

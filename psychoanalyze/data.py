@@ -82,6 +82,11 @@ class ValueFilter(Filter):
         return df[df[self.variable] == self.value]
 
 
+class IndexFilter(Filter):
+    def filter(self, df):
+        return df[df.index.get_level_values(self.variable) == self.value]
+
+
 # class FilterCollection:
 #     def __init__(self, filters):
 #         self.filters = filters

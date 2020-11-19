@@ -47,6 +47,12 @@ def test_filter_ind_variable():
     assert "PW" not in filtered_data["X dimension"].to_list()
 
 
+def test_filter_const_value():
+    filter = data.IndexFilter("Ref PW", 200)
+    filtered_data = df.curve.filter([filter])
+    assert set(filtered_data.index.get_level_values("Ref PW").to_list()) == {200}
+
+
 # def test_regression_data_has_X_column():
 
 
