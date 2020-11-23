@@ -67,24 +67,19 @@ outliers = {
 
 
 class Filter:
-    def __init__(self, variable, value):
+    def __init__(self, type_, variable, value):
+        self.type_ = type_
         self.variable = variable
         self.value = value
 
-
-class RangeFilter(Filter):
     def filter(self, df):
-        return df[df[self.variable].between(self.value[0], self.value[1])]
-
-
-class ValueFilter(Filter):
-    def filter(self, df):
-        return df[df[self.variable] == self.value]
-
-
-class IndexFilter(Filter):
-    def filter(self, df):
-        return df[df.index.get_level_values(self.variable) == self.value]
+        if self.type_ == "range":
+            return df[df[self.variable].between(self.value[0], self.value[1])]
+        elif self.type_ == "value":
+            if self.variable in df.columns:
+                return df[df[self.variable] == self.value]
+            else:
+                return df[df.index.get_level_values(self.variable) == self.value]
 
 
 # class FilterCollection:

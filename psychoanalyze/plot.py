@@ -20,7 +20,7 @@ thresh_percent = 0.5
 
 axis_settings = {
     "ticks": "outside",
-    "rangemode": "tozero",
+    # "rangemode": "tozero",
     "showgrid": False,
 }
 

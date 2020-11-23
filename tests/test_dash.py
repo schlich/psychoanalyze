@@ -3,6 +3,7 @@ import dash
 import time
 import dash_html_components as html
 from dash.testing.application_runners import import_app
+from selenium.webdriver.support.ui import Select
 
 
 def css_escape(s):
@@ -12,6 +13,7 @@ def css_escape(s):
 
 
 def test_001_dash(dash_duo):
+
     # load app
     app = import_app("dashboards.data_app")
     dash_duo.start_server(app)
@@ -28,6 +30,16 @@ def test_001_dash(dash_duo):
     assert len(filters) == 1
 
     # the user notices he can change the filter type with a dropdown menu
+    selector = css_escape('#{"index":1,"type":"filter-type"}')
+    dash_duo.wait_for_element(selector)
+
+    # user selects type Range and variable Days from Implantation
+    dash_duo.select_dcc_dropdown(
+        css_escape('#{"index":1,"type":"filter-type"}'), "Range"
+    )
+    dash_duo.select_dcc_dropdown(
+        css_escape('#{"index":1,"type":"filter-variable"}'), "Days from Implantation"
+    )
 
     # dash_duo.multiple_click("#remove-filter-1", 1)
     # filters = dash_duo.find_elements(".filter")
@@ -41,3 +53,8 @@ def test_001_dash(dash_duo):
     # dash_duo.wait_for_contains_text(
     #     "#officer-info", "No longer employed with the SLMPD"
     # )
+
+
+# def test_002_multiple_filters(dash_duo):
+#     app = import_app("dashboards.data_app")
+#     dash_duo.start_server(app)

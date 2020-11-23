@@ -199,17 +199,17 @@ six = "*"
 
 [[package]]
 name = "dash"
-version = "1.16.3"
+version = "1.17.0"
 description = "A Python framework for building reactive web-apps. Developed by Plotly."
 category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*"
 
 [package.dependencies]
-dash-core-components = "1.12.1"
+dash-core-components = "1.13.0"
 dash-html-components = "1.1.1"
-dash_renderer = "1.8.2"
-dash-table = "4.10.1"
+dash_renderer = "1.8.3"
+dash-table = "4.11.0"
 Flask = ">=1.0.2"
 flask-compress = "*"
 future = "*"
@@ -235,7 +235,7 @@ pandas = ["numpy", "pandas"]
 
 [[package]]
 name = "dash-core-components"
-version = "1.12.1"
+version = "1.13.0"
 description = "Core component suite for Dash"
 category = "main"
 optional = false
@@ -251,7 +251,7 @@ python-versions = "*"
 
 [[package]]
 name = "dash-renderer"
-version = "1.8.2"
+version = "1.8.3"
 description = "Front-end component renderer for Dash"
 category = "main"
 optional = false
@@ -259,7 +259,7 @@ python-versions = "*"
 
 [[package]]
 name = "dash-table"
-version = "4.10.1"
+version = "4.11.0"
 description = "Dash table"
 category = "main"
 optional = false
@@ -1681,23 +1681,23 @@ cycler = [
     {file = "cycler-0.10.0.tar.gz", hash = "sha256:cd7b2d1018258d7247a71425e9f26463dfb444d411c39569972f4ce586b0c9d8"},
 ]
 dash = [
-    {file = "dash-1.16.3.tar.gz", hash = "sha256:596b20d5fdbf1dbcce2a77dc226d85a83e26aa0656c0a7a41e53cd20cc5f7a5e"},
+    {file = "dash-1.17.0.tar.gz", hash = "sha256:06287eb130682ccb823c648310dea4dfbdd30f8f56401b4dce4946aa7c01230a"},
 ]
 dash-bootstrap-components = [
     {file = "dash-bootstrap-components-0.10.7.tar.gz", hash = "sha256:19c8c7d0d390badf72ef901da46e8c3270e204e8f8e9ab7997de29aeb39ad7b9"},
     {file = "dash_bootstrap_components-0.10.7-py2.py3-none-any.whl", hash = "sha256:4ad4898450d9a3baa4b47d9ab00f2a20c56ef58734828b72ccf9a690628b0672"},
 ]
 dash-core-components = [
-    {file = "dash_core_components-1.12.1.tar.gz", hash = "sha256:27f2ac612f5574dcd0d645f9302ceca5975bbdac6791865692e3ac51d0aec7f4"},
+    {file = "dash_core_components-1.13.0.tar.gz", hash = "sha256:f92025b12931539cdda2173f2b4cd077119cbabbf3ddf62333f6302fd0d8a3ac"},
 ]
 dash-html-components = [
     {file = "dash_html_components-1.1.1.tar.gz", hash = "sha256:2c662e640528c890aaa0fa23d48e51c4d13ce69a97841d856ddcaaf2c6a47be3"},
 ]
 dash-renderer = [
-    {file = "dash_renderer-1.8.2.tar.gz", hash = "sha256:84cbb22019299a5a3c268ec1143c6f241c3f136e95753edac83a81673b7fa04e"},
+    {file = "dash_renderer-1.8.3.tar.gz", hash = "sha256:f7ab2b922f4f0850bae0e9793cec99f8a1a241e5f7f5786e367ddd9e41d2b170"},
 ]
 dash-table = [
-    {file = "dash_table-4.10.1.tar.gz", hash = "sha256:1aa02180faef13434364286b60404d26164d1ce2779c765c9c52e6935991a4e9"},
+    {file = "dash_table-4.11.0.tar.gz", hash = "sha256:3170504a8626a9676b016c5ab456ab8c1fb1ea0206dcc2eddb8c4c6589216304"},
 ]
 decorator = [
     {file = "decorator-4.4.2-py2.py3-none-any.whl", hash = "sha256:41fa54c2a0cc4ba648be4fd43cff00aedf5b9465c9bf18d64325bc225f08f760"},

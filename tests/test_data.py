@@ -34,21 +34,21 @@ def test_no_filters():
 
 def test_filter_days():
     assert len(df["Days"]) > 0
-    filter = data.RangeFilter("Days", [200, 300])
+    filter = data.Filter("range", "Days", [200, 300])
     filtered_data = df.curve.filter([filter])
     assert filtered_data["Days"].min() >= filter.value[0]
     assert filtered_data["Days"].max() <= filter.value[1]
 
 
 def test_filter_ind_variable():
-    filter = data.ValueFilter("X dimension", "Amp")
+    filter = data.Filter("value", "X dimension", "Amp")
     filtered_data = df.curve.filter([filter])
     assert "Amp" in filtered_data["X dimension"].to_list()
     assert "PW" not in filtered_data["X dimension"].to_list()
 
 
 def test_filter_const_value():
-    filter = data.IndexFilter("Ref PW", 200)
+    filter = data.Filter("value", "Ref PW", 200)
     filtered_data = df.curve.filter([filter])
     assert set(filtered_data.index.get_level_values("Ref PW").to_list()) == {200}
 
