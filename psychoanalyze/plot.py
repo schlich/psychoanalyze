@@ -98,14 +98,18 @@ def threshold_v_time(df, export_path=None, stimulus_dimension="Amp"):
 #     return px.scatter()
 
 
-def weber(curves, x_var="Ref Charge", color="Monkey", symbol="Channel(s)"):
-    curves["Ref Charge"] = curves.curve.X_q()
-    summary = curves.groupby([color, symbol, x_var])["location"].agg(
-        ["mean", "std", "count"]
-    )
+def weber(curves, dimension, color="Monkey", symbol=None):
+    # curves["Ref Charge"] = curves.curve.X_q()
+    groups = []
+    if color:
+        groups.append(color)
+    if symbol:
+        groups.append(symbol)
+    groups.append(dimension)
+    summary = curves.groupby(groups)["location"].agg(["mean", "std", "count"])
     fig = px.scatter(
         summary.reset_index(),
-        x=x_var,
+        x=dimension,
         y="mean",
         error_y="std",
         size="count",
@@ -115,19 +119,19 @@ def weber(curves, x_var="Ref Charge", color="Monkey", symbol="Channel(s)"):
         template=template,
         symbol_map=symbol_map,
     )
-    # regressions = curves.groupby([color, symbol, x_var]).apply(data.regress)
+    # regressions = curves.groupby([color, symbol, dimension]).apply(data.regress)
     # if isinstance(regressions, pd.Series):
     #     regressions = regressions.to_frame()
-    # ref = curves[x_var].to_frame()
+    # ref = curves[dimension].to_frame()
     # # print(ref.index.names)
     # regressions = regressions.join(ref)
     # # print(regressions.index.names)
     # m = regressions["slope"]
     # b = regressions["intercept"]
-    # regressions["y"] = m * regressions[x_var] + b
+    # regressions["y"] = m * regressions[dimension] + b
     # regressions_fig = px.line(
     #     regressions.reset_index(),
-    #     x=x_var,
+    #     x=dimension,
     #     y="y",
     #     color="Monkey",
     #     # line_group=groups[-1],
@@ -226,33 +230,33 @@ def psycho(curves):
 #     return fig
 
 
-def get_df(x_var, date_range, constant_values, experiment_type):
+def get_df(dimension, date_range, constant_values, experiment_type):
     df = curves
     df = data.filter(
         df,
         experiment_type=experiment_type,
         ranges={"Days": date_range},
         values={
-            "X dimension": x_var,
+            "X dimension": dimension,
         },
     )
     df = sort_channel_labels(df)
     #     df = df.dropna()
-    groups = ["Monkey", f"Ref {x_var}"]
+    groups = ["Monkey", f"Ref {dimension}"]
     summary = df.groupby(groups)["location"].agg(["mean", "std", "count"])
     return summary.reset_index()
 
 
 def get_plot(
-    x_var,
+    dimension,
     date_range=(0, 800),
     constant_values=100,
     experiment_type="discrimination",
     y_var="mean",
     color="Monkey",
 ):
-    df = get_df(x_var, date_range, constant_values, experiment_type)
+    df = get_df(dimension, date_range, constant_values, experiment_type)
     fig = px.scatter(
-        df, x=f"Ref {x_var}", y=y_var, color=color, size="count", template=template
+        df, x=f"Ref {dimension}", y=y_var, color=color, size="count", template=template
     )
     return fig

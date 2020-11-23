@@ -16,7 +16,6 @@ from psychoanalyze import plot, data
 
 # external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=[dbc.themes.LUX])
-styles = {"pre": {"border": "thin lightgrey solid", "overflowX": "scroll"}}
 
 all_data = data.load()
 curves = data.load("curves")
@@ -34,36 +33,16 @@ app.layout = html.Div(
         dbc.Button("Add Filter", id="add-filter", n_clicks=0),
         dbc.Row(id="filter-container", children=[]),
         html.P(id="remove-btn-output"),
-        # dbc.Row(
-        #     [
-        #         dbc.Col(
-        #             [
-        #                 html.H4("Electrode Configuration:"),
-        #                 dcc.RadioItems(
-        #                     options=[
-        #                         {"label": " Monopolar", "value": "Monopolar"},
-        #                         {"label": " Multipolar", "value": "Multipolar"},
-        #                     ],
-        #                     value="Monopolar",
-        #                     id={
-        #                         "type": "filter",
-        #                         "id": "electrode-config",
-        #                     },
-        #                     labelStyle={"display": "block"},
-        #                 ),
-        #             ]
-        #         ),
-        #     ]
-        # ),
-        html.Div(dcc.Graph(id="threshold"), id="threshold-div"),
+        html.Div(
+            [dcc.Dropdown(id="plot-type"), dcc.Graph(id="threshold")],
+            id="threshold-div",
+        ),
         html.H4("Symbol variable"),
         dcc.RadioItems(
             options=[
-                {"label": " None", "value": "None"},
                 {"label": " Channel ", "value": "Channel(s)"},
                 {"label": " Method ", "value": "X dimension"},
             ],
-            value="None",
             id="symbol",
         ),
         dcc.Graph(id="weber"),
@@ -75,21 +54,6 @@ app.layout = html.Div(
         dcc.Graph(id="psy-curves"),
     ]
 )
-
-
-# def filter_curves(filters):
-#     curves_sessions = curves.join(sessions).reorder_levels(curves.index.names)
-
-#     data = curves_sessions[
-#         curves_sessions["Days"].between(
-#             filters["date_range"][0], filters["date_range"][1]
-#         )
-#     ]
-#     if filters["x_var"] != "Charge":
-#         data = data[data["X dimension"] == filters["x_var"]]
-#         data = data[data["base"] == filters["const_val"]]
-#     data = data[data["Electrode Config"] == filters["config"]]
-#     return data
 
 
 def get_index_slice(trigger, x_var, monkey, x_val):
@@ -175,17 +139,9 @@ def select_data(df, selected_data, trigger, x_var):
     return "Value: " + str(const_val) + " " + units
 
 
-def combine_filters(filter_types, filter_variables, filter_values):
-    all_filters = []
-    for (type_, variable, value) in zip(filter_types, filter_variables, filter_values):
-        all_filters.append(data.Filter(type_, variable, value))
-    return all_filters
-
-
 @app.callback(
     Output("threshold", "figure"),
     [
-        # Input("electrode-config", "value"),
         Input({"type": "filter-variable", "index": ALL}, "value"),
         Input({"type": "filter-values", "value-type": ALL, "index": ALL}, "value"),
         # Input("symbol", "value"),
@@ -196,7 +152,7 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
     # groups = ['Monkey', symbol]
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
-    all_filters = combine_filters(filter_types, filter_variables, filter_values)
+    all_filters = data.combine_filters(filter_types, filter_variables, filter_values)
     df = detection_df.curve.filter(all_filters)
     thresh_fig = plot.threshold_v_time(df)
 
@@ -209,6 +165,7 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
         # Input("const", "value"),
         # Input("electrode-config", "value"),
         # Input("symbol", "value"),
+        Input("symbol", "value"),
         Input({"type": "filter-variable", "index": ALL}, "value"),
         Input({"type": "filter-values", "value-type": ALL, "index": ALL}, "value"),
     ],
@@ -216,12 +173,12 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
         State({"type": "filter-type", "index": ALL}, "value"),
     ],
 )
-def update_discrim_fig(filter_variables, filter_values, filter_types):
+def update_discrim_fig(symbol, filter_variables, filter_values, filter_types):
     df = curves_sessions
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
-    all_filters = combine_filters(filter_types, filter_variables, filter_values)
+    all_filters = data.combine_filters(filter_types, filter_variables, filter_values)
     discrim_df = discrim_df.curve.filter(all_filters)
-    weber_fig = plot.weber(discrim_df)
+    weber_fig = plot.weber(discrim_df, dimension="Ref Amp", symbol=symbol)
 
     return weber_fig
 
@@ -338,6 +295,7 @@ def assign_filter_variable(filter_type):
         options = [
             {"label": "Independent Variable", "value": "X dimension"},
             {"label": "Reference Pulse Width", "value": "Ref PW"},
+            {"label": "Electrode Configuration", "value": "Electrode Config"},
         ]
     else:
         options = []
@@ -382,6 +340,20 @@ def assign_data_selector(filter_variable, id):
             # max=max_const_var,
             step=None,
             included=False,
+        )
+    elif filter_variable == "Electrode Config":
+        return dcc.RadioItems(
+            options=[
+                {"label": " Monopolar", "value": "Monopolar"},
+                {"label": " Multipolar", "value": "Multipolar"},
+            ],
+            value="Monopolar",
+            id={
+                "type": "filter-values",
+                "value-type": "radio",
+                "index": id["index"],
+            },
+            labelStyle={"display": "block"},
         )
     else:
         return []
