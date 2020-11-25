@@ -21,7 +21,7 @@ all_data = data.load()
 curves = data.load("curves")
 points = data.load("points")
 sessions = data.load("sessions")
-curves_sessions = sessions.join(curves)
+curves_sessions = curves.join(sessions)
 max_date = all_data["Days"].max()
 max_const_var = all_data.index.get_level_values("Ref PW").max()
 groups = ["Monkey", "Ref Amp"]
@@ -34,8 +34,16 @@ app.layout = html.Div(
         dbc.Row(id="filter-container", children=[]),
         html.P(id="remove-btn-output"),
         html.Div(
-            [dcc.Dropdown(id="plot-type"), dcc.Graph(id="threshold")],
-            id="threshold-div",
+            [
+                dcc.Dropdown(id="x-axis"),
+                dcc.Dropdown(id="y-axis"),
+                dcc.Graph(id="correlation-plot"),
+            ],
+            id="correlation-plot-div",
+        ),
+        html.Div(
+            [dcc.Dropdown(id="plot-dimension"), dcc.Graph(id="plot")],
+            id="plot-div",
         ),
         html.H4("Symbol variable"),
         dcc.RadioItems(
@@ -44,6 +52,13 @@ app.layout = html.Div(
                 {"label": " Method ", "value": "X dimension"},
             ],
             id="symbol",
+        ),
+        dcc.Checklist(
+            id="regression",
+            options=[
+                {"label": "Show regression lines", "value": "regression"},
+            ],
+            value=["regression"],
         ),
         dcc.Graph(id="weber"),
         dbc.Input(
@@ -139,8 +154,16 @@ def select_data(df, selected_data, trigger, x_var):
     return "Value: " + str(const_val) + " " + units
 
 
+# @app.callback(
+#     Output("correlation-plot", "figure"),
+#     [Input("x-axis", "value"),
+#     Input("y-axis", "value")]
+# )
+# def update_correl_fig(x_var, y_var):
+
+
 @app.callback(
-    Output("threshold", "figure"),
+    Output("plot", "figure"),
     [
         Input({"type": "filter-variable", "index": ALL}, "value"),
         Input({"type": "filter-values", "value-type": ALL, "index": ALL}, "value"),
@@ -168,6 +191,7 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
         Input("symbol", "value"),
         Input({"type": "filter-variable", "index": ALL}, "value"),
         Input({"type": "filter-values", "value-type": ALL, "index": ALL}, "value"),
+        Input("regression", "value"),
     ],
     [
         State({"type": "filter-type", "index": ALL}, "value"),

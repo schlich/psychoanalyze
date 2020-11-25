@@ -101,6 +101,7 @@ def load(name=None, outliers=outliers, filepath=None):
         df = pd.read_hdf(file, name)
         if outliers:
             df = df.drop(outliers[name])
+        df = df.dropna()
         return df
 
     if name:
@@ -145,7 +146,7 @@ def load(name=None, outliers=outliers, filepath=None):
 def combine_filters(filter_types, filter_variables, filter_values):
     all_filters = []
     for (type_, variable, value) in zip(filter_types, filter_variables, filter_values):
-        all_filters.append(data.Filter(type_, variable, value))
+        all_filters.append(Filter(type_, variable, value))
     return all_filters
 
 
@@ -212,8 +213,8 @@ def sort_channel_labels(df):
     return df
 
 
-def regress(group):
-    regression = LinReg().fit(group.curve.X, group["y"])
+def regress(curves_df):
+    regression = LinReg().fit(curves_df.curve.X.to_frame(), curves_df["location"])
     params = {"slope": regression.coef_[0], "intercept": regression.intercept_}
     return pd.Series(params)
 
@@ -274,6 +275,8 @@ class CurveAccessor:
             return "Amp"
         elif n_refamp_vals < n_refpw_vals:
             return "PW"
+        elif n_refamp_vals == 1 and n_refamp_vals == 1:
+            raise AttributeError("Only 1 data point")
         else:
             raise AttributeError
 

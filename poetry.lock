@@ -608,6 +608,14 @@ requests = "*"
 test = ["pytest", "requests"]
 
 [[package]]
+name = "kaleido"
+version = "0.0.3.post1"
+description = "Static image export for web-based visualization libraries with zero dependencies"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "kiwisolver"
 version = "1.2.0"
 description = "A fast implementation of the Cassowary constraint solver"
@@ -938,7 +946,7 @@ python-versions = ">=3.6"
 
 [[package]]
 name = "plotly"
-version = "4.11.0"
+version = "4.13.0"
 description = "An open-source, interactive data visualization library for Python"
 category = "main"
 optional = false
@@ -1535,7 +1543,7 @@ pandas = ">=0.25"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.8.6"
-content-hash = "0aa8ce515de5d6f5d35119c778ab355f6f6d90282f31aef2edfd2a8513c986f2"
+content-hash = "21186249861d79d1bcae2217d21a6d70135beb37046fa4676c51cd6e153c8637"
 
 [metadata.files]
 appdirs = [
@@ -1800,6 +1808,13 @@ jupyterlab-pygments = [
 jupyterlab-server = [
     {file = "jupyterlab_server-1.2.0-py3-none-any.whl", hash = "sha256:55d256077bf13e5bc9e8fbd5aac51bef82f6315111cec6b712b9a5ededbba924"},
     {file = "jupyterlab_server-1.2.0.tar.gz", hash = "sha256:5431d9dde96659364b7cc877693d5d21e7b80cea7ae3959ecc2b87518e5f5d8c"},
+]
+kaleido = [
+    {file = "kaleido-0.0.3.post1-py2.py3-none-macosx_10_10_x86_64.whl", hash = "sha256:013454cda65ed96c70d6b9338f23f921599292069aed7aacd534b563b145bd7f"},
+    {file = "kaleido-0.0.3.post1-py2.py3-none-manylinux1_x86_64.whl", hash = "sha256:a71e40f16e9f6d64782211b4af3f98b585e93dfc999466ecf186bdf8f8dd9d2c"},
+    {file = "kaleido-0.0.3.post1-py2.py3-none-manylinux2014_aarch64.whl", hash = "sha256:3f29367f2fa86ef099b3b78211355d04abaedec9aaddc9d5ee263988fccd5641"},
+    {file = "kaleido-0.0.3.post1-py2.py3-none-win32.whl", hash = "sha256:71d65ad8ba412fc7044b856c7a49546ae29536a6ac4c05795c75bf24bd9470f7"},
+    {file = "kaleido-0.0.3.post1-py2.py3-none-win_amd64.whl", hash = "sha256:03978623a7360e22fecce14823f1aaab6818c9ea4f2ae400c2f9929fe59ecce5"},
 ]
 kiwisolver = [
     {file = "kiwisolver-1.2.0-cp36-cp36m-macosx_10_9_x86_64.whl", hash = "sha256:443c2320520eda0a5b930b2725b26f6175ca4453c61f739fef7a5847bd262f74"},
@@ -2078,8 +2093,8 @@ pillow = [
     {file = "Pillow-8.0.0.tar.gz", hash = "sha256:59304c67d12394815331eda95ec892bf54ad95e0aa7bc1ccd8e0a4a5a25d4bf3"},
 ]
 plotly = [
-    {file = "plotly-4.11.0-py2.py3-none-any.whl", hash = "sha256:584b3dc685c84b652198166969742115b31892de61c86556f909f3f0f9ccd0d3"},
-    {file = "plotly-4.11.0.tar.gz", hash = "sha256:b6ad5c3d2cbf056a782e3c6833a334c45a5453a12dc8a48df971602509e8d3d6"},
+    {file = "plotly-4.13.0-py2.py3-none-any.whl", hash = "sha256:def55151252ed462f60bb1003d32c93e4f6d57500cda18541c298913c916d57c"},
+    {file = "plotly-4.13.0.tar.gz", hash = "sha256:20df14f7883807f57d96ac245841e086a1799f2c2778462a7f3bca704e369c66"},
 ]
 pluggy = [
     {file = "pluggy-0.13.1-py2.py3-none-any.whl", hash = "sha256:966c145cd83c96502c3c3868f50408687b38434af77734af1e9ca461a4081d2d"},

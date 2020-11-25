@@ -14,7 +14,7 @@ ref_pw_curves = pd.DataFrame(values, index=multiindex.set_names(["Ref PW", "Ref 
 all_curves = data.load("curves")
 all_sessions = data.load("sessions")
 
-df = all_sessions.join(all_curves)
+df = all_curves.join(all_sessions)
 
 
 # def test_regress_group_return_series():
@@ -53,9 +53,31 @@ def test_filter_const_value():
     assert set(filtered_data.index.get_level_values("Ref PW").to_list()) == {200}
 
 
-# def test_regression_data_has_X_column():
+def test_regress_function():
+    amp_curves_df = all_curves[all_curves["X dimension"] == "Amp"]
+    amp_curves_df = amp_curves_df[amp_curves_df.index.get_level_values("Ref PW") == 200]
+    assert set(amp_curves_df.index.get_level_values("Ref PW").to_list()) == {200}
+    params = data.regress(amp_curves_df)
+    assert params["slope"]
 
 
 def test_weber_input_contains_data():
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
-    fig = plot.weber(discrim_df)
+    fig = plot.weber(discrim_df, "Ref Amp")
+
+
+def test_grouped_regression():
+    def remove_singleton_groups(df):
+        return len(set(df.index.get_level_values("Ref Amp").to_list())) > 1
+
+    groups = ["Ref Amp"]
+    amp_curves_df = all_curves[all_curves["X dimension"] == "Amp"]
+    amp_curves_df = amp_curves_df[amp_curves_df.index.get_level_values("Ref PW") == 200]
+    amp_curves_df = amp_curves_df[amp_curves_df["Experiment Type"] == "Discrimination"]
+    assert set(amp_curves_df.index.get_level_values("Ref PW").to_list()) == {200}
+    regression_df = amp_curves_df.groupby(groups).filter(remove_singleton_groups)
+    for name, group in regression_df.groupby(groups):
+        print(name)
+        assert len(group) > 1
+        assert len(set(group.index.get_level_values("Ref Amp").to_list())) > 1
+    regression_df = regression_df.groupby(groups).apply(data.regress)

@@ -11,4 +11,10 @@ def test_detection_plot():
 
 
 def test_weber_plot():
-    plot.weber(df)
+    fig = plot.weber(df, "Ref Amp")
+    assert len(fig.data) > 0
+
+
+def test_regression_fig():
+    fig = plot.regress_fig(curves, "Ref Amp")
+    assert len(fig.data) > 0

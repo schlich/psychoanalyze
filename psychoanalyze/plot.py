@@ -61,6 +61,19 @@ symbol_map = {
 }
 
 
+def correlation(df, x_var, y_var):
+    df = df[df["Experiment Type"] == "Detection"]
+    df = df.reset_index()
+    fig = px.scatter(
+        df,
+        x=x_var,
+        y=y_var,
+        color="Monkey",
+        template=template,
+    )
+    return fig
+
+
 def threshold_v_time(df, export_path=None, stimulus_dimension="Amp"):
     df = df[df["Experiment Type"] == "Detection"]
     df = df.reset_index()
@@ -96,9 +109,29 @@ def threshold_v_time(df, export_path=None, stimulus_dimension="Amp"):
 # def weber(discrim_df):
 
 #     return px.scatter()
+def regress_fig(curves_df, groups):
+    dimension = groups[-1]
+    regressions = curves_df.groupby(groups).filter(lambda x: len(x) > 1)
+    regressions = regressions.groupby(groups).apply(data.regress)
+    if isinstance(regressions, pd.Series):
+        regressions = regressions.to_frame()
+    ref = curves_df[dimension].to_frame()
+    # print(ref.index.names)
+    regressions = regressions.join(ref)
+    # print(regressions.index.names)
+    m = regressions["slope"]
+    b = regressions["intercept"]
+    regressions["y"] = m * regressions[dimension] + b
+    fig = px.line(
+        regressions.reset_index(),
+        x=dimension,
+        y="y",
+        color="Monkey",
+    )
+    return fig
 
 
-def weber(curves, dimension, color="Monkey", symbol=None):
+def weber(curves, dimension, color="Monkey", symbol=None, regressions=False):
     # curves["Ref Charge"] = curves.curve.X_q()
     groups = []
     if color:
@@ -119,38 +152,24 @@ def weber(curves, dimension, color="Monkey", symbol=None):
         template=template,
         symbol_map=symbol_map,
     )
-    # regressions = curves.groupby([color, symbol, dimension]).apply(data.regress)
-    # if isinstance(regressions, pd.Series):
-    #     regressions = regressions.to_frame()
-    # ref = curves[dimension].to_frame()
-    # # print(ref.index.names)
-    # regressions = regressions.join(ref)
-    # # print(regressions.index.names)
-    # m = regressions["slope"]
-    # b = regressions["intercept"]
-    # regressions["y"] = m * regressions[dimension] + b
-    # regressions_fig = px.line(
-    #     regressions.reset_index(),
-    #     x=dimension,
-    #     y="y",
-    #     color="Monkey",
-    #     # line_group=groups[-1],
-    # )
-    # # for monkey in regressions.keys():
-    # #     x = regressions[]
-    # #     y = regressions[monkey]['y']
-    # #     fig.add_scatter(
-    # #         x=x,
-    # #         y=y,
-    # #         mode='lines',
-    # #         showlegend=False,
-    # #         color=colormap[monkey]
-    # #     )
-    # for trace in regressions_fig.data:
-    #     fig.add_trace(trace)
+    if regressions:
 
-    # # fig.update_layout(yaxis_title='Mean Difference Threshold (nC)')
-    # # fig.update_layout(xaxis_title='Ref Charge (nC)')
+        # line_group=groups[-1],
+        # for monkey in regressions.keys():
+        #     x = regressions[]
+        #     y = regressions[monkey]['y']
+        #     fig.add_scatter(
+        #         x=x,
+        #         y=y,
+        #         mode='lines',
+        #         showlegend=False,
+        #         color=colormap[monkey]
+        #     )
+        for trace in regressions_fig.data:
+            fig.add_trace(trace)
+
+        # fig.update_layout(yaxis_title='Mean Difference Threshold (nC)')
+        # fig.update_layout(xaxis_title='Ref Charge (nC)')
     return fig
 
 
