@@ -8,7 +8,6 @@ from selenium.webdriver.support.ui import Select
 
 def css_escape(s):
     sel = re.sub("[\\{\\}\\\"\\'.:,]", lambda m: "\\" + m.group(0), s)
-    print(sel)
     return sel
 
 

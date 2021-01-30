@@ -60,9 +60,15 @@ outliers = {
         ("U", Timestamp("2016-12-21 00:00:00"), 0, 0, 0, 0, 15, 128),
         ("U", Timestamp("2017-08-07 00:00:00"), 400, 100, 50, 500, 15, 32),
         ("U", Timestamp("2017-06-21 00:00:00"), 400, 100, 50, 500, 15, 32),
+        ("U", Timestamp("2016-11-29 00:00:00"), 0, 0, 0, 0, 96, 144),
+        # 2D input (Amp + PW)
+        # ("Y", Timestamp("2016-12-27 00:00:00"), 0, 0, 0, 0, 15, 128),
     ],
     "points": [],
-    "sessions": [],
+    "sessions": [
+        ("Y", Timestamp("2016-12-27 00:00:00")),
+        ("Y", Timestamp("2017-05-03")),
+    ],
 }
 
 
@@ -213,10 +219,29 @@ def sort_channel_labels(df):
     return df
 
 
-def regress(curves_df):
-    regression = LinReg().fit(curves_df.curve.X.to_frame(), curves_df["location"])
-    params = {"slope": regression.coef_[0], "intercept": regression.intercept_}
+def regress_group(group, y):
+    df = group
+    regression = LinReg().fit(df["x"].to_frame(), df[y])
+    params = {
+        "slope": regression.coef_[0],
+        "intercept": regression.intercept_,
+    }
     return pd.Series(params)
+
+
+def regress(
+    df,
+    x=None,
+    y=None,
+    *,
+    groups=["Monkey"],
+):
+    if x in df.index.names:
+        df.loc[:, "x"] = df.index.get_level_values(x)
+    elif x in df.columns:
+        df.loc[:, "x"] = df[x]
+    regressions = df.groupby(groups).apply(regress_group, y=y)
+    return regressions
 
 
 def fit_curve(curve):
@@ -249,53 +274,130 @@ def fit_curve(curve):
     return curve
 
 
-@pd.api.extensions.register_dataframe_accessor("curve")
-class CurveAccessor:
-    def __init__(self, pandas_obj):
-        self._validate(pandas_obj)
-        self._obj = pandas_obj
+def not_singleton_group(df):
+    return len(set(df.index.get_level_values("Ref Amp"))) > 1
 
-    @staticmethod
-    def _validate(obj):
-        if "Ref Amp" not in obj.index.names or "Ref PW" not in obj.index.names:
-            raise AttributeError(
-                "Must pass a DataFrame with Ref Amp and Ref PW indexes"
-            )
-        if len(obj.index) < 3:
-            raise AttributeError("Not enough data points")
 
-    @property
-    def ind_var(self):
-        df = self._obj
-        n_refamp_vals = len(df.index.get_level_values("Ref Amp").unique())
-        n_refpw_vals = len(df.index.get_level_values("Ref PW").unique())
-        if (n_refamp_vals > 1) and (n_refpw_vals > 1):
-            raise AttributeError("Multiple values for both ref amp and ref pw")
-        elif n_refamp_vals > n_refpw_vals:
-            return "Amp"
-        elif n_refamp_vals < n_refpw_vals:
-            return "PW"
-        elif n_refamp_vals == 1 and n_refamp_vals == 1:
-            raise AttributeError("Only 1 data point")
-        else:
-            raise AttributeError
+def regress_groups(curves_df, groups, dimension):
+    regressions = curves_df.groupby(groups).filter(not_singleton_group)
+    curves_df = curves_df.reset_index(col_level=dimension)
+    curves_df["X"] = curves_df[dimension]
+    regressions = curves_df.groupby(groups).apply(regress)
+    if isinstance(regressions, pd.Series):
+        regressions = regressions.to_frame()
+    return regressions
 
-    @property
-    def X(self):
-        return self._obj.index.get_level_values(f"Ref {self.ind_var}")
 
-    def X_q(self):
-        amps = self._obj.index.get_level_values("Ref Amp")
-        pws = self._obj.index.get_level_values("Ref PW")
-        return amps * pws / 1000
+def calc_base_value(curves, points):
+    df = points.groupby()["location"].join(points)
+    curves_charge = curves_charge.apply(calc, axis=1)
+    return curves_charge
 
-    def polarity(curve_series):
-        pass
+
+def column_values_by_mapping(df, map, source_column_name):
+    series = df[df[source_column_name].map(map)]
+    return series
+
+
+class CurveSet:
+    def __init__(self, curves_df):
+        self.df = curves_df
+
+    # @staticmethod
+    # def _validate(obj):
+    #     if "Ref Amp" not in obj.index.names or "Ref PW" not in obj.index.names:
+    #         raise AttributeError(
+    #             "Must pass a DataFrame with Ref Amp and Ref PW indexes"
+    #         )
+    #     # if len(obj.index) < 3:
+    #     #     raise AttributeError("Not enough data points")
+
+    # @property
+    # def ind_var(self):
+    #     df = self._obj
+    #     n_refamp_vals = len(set(df.index.get_level_values("Ref Amp")))
+    #     n_refpw_vals = len(set(df.index.get_level_values("Ref PW")))
+    #     if n_refamp_vals > n_refpw_vals:
+    #         return "Amp"
+    #     elif n_refamp_vals < n_refpw_vals:
+    #         return "PW"
+    #     elif n_refamp_vals == 1 and n_refamp_vals == 1:
+    #         raise AttributeError("Only 1 data point")
+    #     else:
+    #         raise AttributeError
+
+    # @property
+    # def X(self):
+    #     return self._obj.index.get_level_values(f"Ref {self.ind_var}")
+
+    # def X_q(self):
+    #     amps = self._obj.index.get_level_values("Ref Amp")
+    #     pws = self._obj.index.get_level_values("Ref PW")
+    #     return amps * pws / 1000
+
+    # def polarity(curve_series):
+    #     pass
 
     def filter(self, filters):
-        df = self._obj
+        df = self.df
         for f in filters:
             df = f.filter(df)
         return df
 
     # if curve_series['Channel(s)'].isin()
+
+
+def get_index_slice(trigger, x_var, monkey, x_val):
+    if trigger == "threshold":
+        return pd.IndexSlice[monkey, x_val, :, :, :, :, :]
+    else:
+        if x_var == "PW":
+            return pd.IndexSlice[monkey, :, :, x_val, :, :, :]
+        elif x_var == "Amp":
+            return pd.IndexSlice[monkey, :, x_val, :, :, :, :]
+        elif x_var == "Charge":
+            return pd.IndexSlice[monkey, :, :, :, :, :, :]
+
+
+def select_data(df, selected_data, trigger, x_var):
+    if trigger == "curve-select":
+        selected_data = df[df["id"] == curve_select]
+    else:
+        data_list = []
+        for point in selected_data:
+            monkey = point["customdata"][0]
+            x_val = point["customdata"][1]
+            idx_slice = data.get_index_slice(trigger, x_var, monkey, x_val)
+            data_slice = df.loc[idx_slice, :]
+            data_list.append(data_slice)
+        selected_data = pd.concat(data_list)
+    return selected_data
+
+
+def pool(data, x_axis="Reference Charge (nC)", y_axis="Threshold Charge (nC)"):
+    groups = ["Monkey", "X dimension", x_axis]
+    df = (
+        data.groupby(groups)[y_axis]
+        .agg(["mean", "std", "count"])
+        .rename(columns={"mean": y_axis})
+    )
+    return df
+
+
+def get_extrema(data_df, groups, x_var):
+    data_df = data_df.reset_index()
+    extrema_df = data_df.groupby(groups)[x_var].agg(x_min="min", x_max="max")
+    return extrema_df
+
+
+# def get_extrema(data_df, axis="Reference Charge (nC)"):
+#     data_df["x_min"] = data_df[axis].min()
+#     data_df["x_max"] = data_df[axis].max()
+#     return data_df
+
+
+def get_bounds(regression_df, data_df, x_var):
+    groups = regression_df.index.names
+    bounds = get_extrema(data_df, groups, x_var)
+    bounded_regression = regression_df.join(bounds)
+    return bounded_regression

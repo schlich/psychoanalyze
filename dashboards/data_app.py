@@ -1,6 +1,4 @@
 import dash
-import json
-import dash_table as dt
 import pandas as pd
 import dash_core_components as dcc
 import dash_html_components as html
@@ -33,16 +31,26 @@ app.layout = html.Div(
         dbc.Button("Add Filter", id="add-filter", n_clicks=0),
         dbc.Row(id="filter-container", children=[]),
         html.P(id="remove-btn-output"),
+        # html.Div(
+        #     [
+        #         dcc.Dropdown(id="x-axis"),
+        #         dcc.Dropdown(id="y-axis"),
+        #         dcc.Graph(id="correlation-plot"),
+        #     ],
+        #     id="correlation-plot-div",
+        # ),
         html.Div(
             [
-                dcc.Dropdown(id="x-axis"),
-                dcc.Dropdown(id="y-axis"),
-                dcc.Graph(id="correlation-plot"),
+                dcc.Dropdown(
+                    id="plot-dimension",
+                    options=[
+                        {"label": "Amplitude", "value": "Amp"},
+                        {"label": "Pulse Width", "value": "PW"},
+                    ],
+                    value="Amp",
+                ),
+                dcc.Graph(id="plot"),
             ],
-            id="correlation-plot-div",
-        ),
-        html.Div(
-            [dcc.Dropdown(id="plot-dimension"), dcc.Graph(id="plot")],
             id="plot-div",
         ),
         html.H4("Symbol variable"),
@@ -52,6 +60,7 @@ app.layout = html.Div(
                 {"label": " Method ", "value": "X dimension"},
             ],
             id="symbol",
+            value="Channel(s)",
         ),
         dcc.Checklist(
             id="regression",
@@ -71,95 +80,62 @@ app.layout = html.Div(
 )
 
 
-def get_index_slice(trigger, x_var, monkey, x_val):
-    if trigger == "threshold":
-        return pd.IndexSlice[monkey, x_val, :, :, :, :, :]
-    else:
-        if x_var == "PW":
-            return pd.IndexSlice[monkey, :, :, x_val, :, :, :]
-        elif x_var == "Amp":
-            return pd.IndexSlice[monkey, :, x_val, :, :, :, :]
-        elif x_var == "Charge":
-            return pd.IndexSlice[monkey, :, :, :, :, :, :]
+# @app.callback(
+#     [
+#         Output("const", "marks"),
+#         Output("const", "max"),
+#         Output("const", "min"),
+#         Output("const", "value"),
+#     ],
+#     [
+#         Input({"type": "filter", "index": "x_var"}, "value"),
+#         Input({"type": "filter", "index": "electrode-config"}, "value"),
+#     ],
+# )
+# def switch_mode(x_var, config):
+#     df = curves[curves["Electrode Config"] == config]
+#     if x_var == "Charge":
+#         ref_amps = df.index.get_level_values("Ref Amp")
+#         ref_pws = df.index.get_level_values("Ref PW")
+#         df["Ref Charge"] = ref_amps * ref_pws / 1000
+#         reverse = "Charge"
+#         units = "nC"
+#         values = df["Ref Charge"]
+#         grouped = df.groupby("Ref Charge")["id"]
+#     else:
+#         if x_var == "Amp":
+#             reverse = "PW"
+#             units = "μs"
+#         elif x_var == "PW":
+#             reverse = "Amp"
+#             units = "μA"
+#         values = df.index.get_level_values(f"Ref {reverse}")
+#         grouped = df.groupby(f"Ref {reverse}")["id"]
 
+#     counts = grouped.agg("count").drop(0)
+#     filtered_counts = counts[counts > 5]
+#     # df = df[df.index.get_level_values(f'Ref {reverse}').isin(filtered_counts.index.values)]
+#     values = list(filtered_counts.index.values)
+#     max_const_var = max(values)
+#     min_const_var = min(values)
+#     const_var_marks = {str(val): f"{val} {units}" for val in sorted(values)}
+#     value = counts.idxmax()
 
-def select_data(df, selected_data, trigger, x_var):
-    if trigger == "curve-select":
-        selected_data = df[df["id"] == curve_select]
-    else:
-        data_list = []
-        for point in selected_data:
-            monkey = point["customdata"][0]
-            x_val = point["customdata"][1]
-            idx_slice = get_index_slice(trigger, x_var, monkey, x_val)
-            data_slice = df.loc[idx_slice, :]
-            data_list.append(data_slice)
-        selected_data = pd.concat(data_list)
-    return selected_data
-
-    # @app.callback(
-    #     [
-    #         Output("const", "marks"),
-    #         Output("const", "max"),
-    #         Output("const", "min"),
-    #         Output("const", "value"),
-    #     ],
-    #     [
-    #         Input({"type": "filter", "index": "x_var"}, "value"),
-    #         Input({"type": "filter", "index": "electrode-config"}, "value"),
-    #     ],
-    # )
-    # def switch_mode(x_var, config):
-    df = curves[curves["Electrode Config"] == config]
-    if x_var == "Charge":
-        ref_amps = df.index.get_level_values("Ref Amp")
-        ref_pws = df.index.get_level_values("Ref PW")
-        df["Ref Charge"] = ref_amps * ref_pws / 1000
-        reverse = "Charge"
-        units = "nC"
-        values = df["Ref Charge"]
-        grouped = df.groupby("Ref Charge")["id"]
-    else:
-        if x_var == "Amp":
-            reverse = "PW"
-            units = "μs"
-        elif x_var == "PW":
-            reverse = "Amp"
-            units = "μA"
-        values = df.index.get_level_values(f"Ref {reverse}")
-        grouped = df.groupby(f"Ref {reverse}")["id"]
-
-    counts = grouped.agg("count").drop(0)
-    filtered_counts = counts[counts > 5]
-    # df = df[df.index.get_level_values(f'Ref {reverse}').isin(filtered_counts.index.values)]
-    values = list(filtered_counts.index.values)
-    max_const_var = max(values)
-    min_const_var = min(values)
-    const_var_marks = {str(val): f"{val} {units}" for val in sorted(values)}
-    value = counts.idxmax()
-
-    return const_var_marks, max_const_var, min_const_var, value
-
-    # @app.callback(
-    #     Output("const-val", "children"),
-    #     [Input("const", "value"), Input({"type": "filter", "id": "x_var"}, "value")],
-    # )
-    # def display_const_value(const_val, mode):
-    if mode == "PW":
-        units = "μA"
-    elif mode == "Amp":
-        units = "μs"
-    elif mode == "Charge":
-        units = "nc"
-    return "Value: " + str(const_val) + " " + units
+#     return const_var_marks, max_const_var, min_const_var, value
 
 
 # @app.callback(
-#     Output("correlation-plot", "figure"),
-#     [Input("x-axis", "value"),
-#     Input("y-axis", "value")]
+#     Output("const-val", "children"),
+#     [Input("const", "value"), Input({"type": "filter", "id": "x_var"}, "value")],
 # )
-# def update_correl_fig(x_var, y_var):
+# def display_const_value(const_val, mode):
+#     if mode == "PW":
+#         units = "μA"
+#     elif mode == "Amp":
+#         units = "μs"
+#     elif mode == "Charge":
+#         units = "nc"
+#     return "Value: " + str(const_val) + " " + units
 
 
 @app.callback(
@@ -175,8 +151,9 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
     # groups = ['Monkey', symbol]
     df = curves_sessions
     detection_df = df[df["Experiment Type"] == "Detection"]
+    curveset = data.CurveSet(detection_df)
     all_filters = data.combine_filters(filter_types, filter_variables, filter_values)
-    df = detection_df.curve.filter(all_filters)
+    df = curveset.filter(all_filters)
     thresh_fig = plot.threshold_v_time(df)
 
     return thresh_fig
@@ -189,68 +166,77 @@ def update_detection_fig(filter_variables, filter_values, filter_types):
         # Input("electrode-config", "value"),
         # Input("symbol", "value"),
         Input("symbol", "value"),
-        Input({"type": "filter-variable", "index": ALL}, "value"),
         Input({"type": "filter-values", "value-type": ALL, "index": ALL}, "value"),
         Input("regression", "value"),
+        Input("plot-dimension", "value"),
     ],
     [
+        State({"type": "filter-variable", "index": ALL}, "value"),
         State({"type": "filter-type", "index": ALL}, "value"),
     ],
+    prevent_initial_call=True,
 )
-def update_discrim_fig(symbol, filter_variables, filter_values, filter_types):
+def update_discrim_fig(
+    symbol, filter_values, regression, plot_dimension, filter_variables, filter_types
+):
     df = curves_sessions
     discrim_df = df[df["Experiment Type"] == "Discrimination"]
+    curveset = data.CurveSet(discrim_df)
     all_filters = data.combine_filters(filter_types, filter_variables, filter_values)
-    discrim_df = discrim_df.curve.filter(all_filters)
-    weber_fig = plot.weber(discrim_df, dimension="Ref Amp", symbol=symbol)
+    filtered_discrim_df = curveset.filter(all_filters)
+    weber_fig = plot.WeberPlot(
+        filtered_discrim_df,
+        f"Ref {plot_dimension}",
+        color="Monkey",
+        symbol=symbol,
+        regressions=regression,
+    )
 
-    return weber_fig
+    return weber_fig.plot()
 
+    # @app.callback(
+    #     [
+    #         Output("psy-curves", "figure"),
+    #     ],
+    # #     [
+    # #         # Input("date-range", "value"),
+    # #         # Input("x_var", "value"),
+    # #         # Input("const", "value"),
+    # #         # Input("electrode-config", "value"),
+    # #         Input({"type": "filter", "id": ALL}, "value"),
+    # #         Input("weber", "selectedData"),
+    # #         Input("threshold", "selectedData"),
+    # #         Input("curve-select", "value"),
+    # #     ],
+    # # )
+    # def display_selected_data(
+    #     date_range, x_var, const_val, config, weber_data, threshold_data, curve_select
+    # ):
+    # # selected_data = [weber_data, threshold_data]
+    # context = dash.callback_context
+    # triggered = context.triggered[0]["prop_id"].split(".")[0]
+    # df = filter_curves(
+    #     date_range=date_range,
+    #     x_var=x_var,
+    #     const_val=const_val,
+    #     config=config,
+    # )
+    # selected_data = df
 
-#     # @app.callback(
-#     #     [
-#     #         Output("psy-curves", "figure"),
-#     #         Output("psy-curves", "style"),
-#     #     ],
-#     #     [
-#     #         # Input("date-range", "value"),
-#     #         # Input("x_var", "value"),
-#     #         # Input("const", "value"),
-#     #         # Input("electrode-config", "value"),
-#     #         Input({"type": "filter", "id": ALL}, "value"),
-#     #         Input("weber", "selectedData"),
-#     #         Input("threshold", "selectedData"),
-#     #         Input("curve-select", "value"),
-#     #     ],
-#     # )
-#     # def display_selected_data(
-#     #     date_range, x_var, const_val, config, weber_data, threshold_data, curve_select
-#     # ):
-#     # selected_data = [weber_data, threshold_data]
-#     context = dash.callback_context
-#     triggered = context.triggered[0]["prop_id"].split(".")[0]
-#     df = filter_curves(
-#         date_range=date_range,
-#         x_var=x_var,
-#         const_val=const_val,
-#         config=config,
-#     )
-#     selected_data = df
-
-#     # idx_slice = get_index_slice(triggered, x_var)
-#     if len(df.index) == 0:
-#         psy_curves_div = {"display": "none"}
-#         fig = {}
-#     else:
-#         if triggered == "weber":
-#             points = weber_data["points"]
-#             selected_data = select_data(df, points, triggered, x_var)
-#         elif triggered == "threshold":
-#             points = threshold_data["points"]
-#             selected_data = select_data(df, points, triggered, x_var)
-#         psy_curves_div = {"display": "block"}
-#     fig = plot.psycho(selected_data)
-#     return fig, json.dumps(weber_data, indent=2), psy_curves_div
+    # # idx_slice = data.get_index_slice(triggered, x_var)
+    # if len(df.index) == 0:
+    #     psy_curves_div = {"display": "none"}
+    #     fig = {}
+    # else:
+    #     if triggered == "weber":
+    #         points = weber_data["points"]
+    #         selected_data = data.select_data(df, points, triggered, x_var)
+    #     elif triggered == "threshold":
+    #         points = threshold_data["points"]
+    #         selected_data = data.select_data(df, points, triggered, x_var)
+    #     psy_curves_div = {"display": "block"}
+    # fig = plot.psycho(selected_data)
+    # return fig, json.dumps(weber_data, indent=2), psy_curves_div
 
 
 @app.callback(
@@ -265,46 +251,19 @@ def update_discrim_fig(symbol, filter_variables, filter_values, filter_types):
 )
 def update_filters(n_clicks, remove_clicks, children):
     triggered = dash.callback_context.triggered[0]["prop_id"]
-    if n_clicks:
+    index = n_clicks + 1
+    if n_clicks or remove_clicks:
         if triggered == "add-filter.n_clicks":
-            new_filter = dbc.Col(
-                dbc.Card(
-                    [
-                        html.H6("Filter type:"),
-                        dcc.Dropdown(
-                            id={"type": "filter-type", "index": n_clicks},
-                            options=[
-                                {"label": "Range", "value": "range"},
-                                {"label": "Value", "value": "value"},
-                            ],
-                        ),
-                        html.H6("Variable:"),
-                        dcc.Dropdown(
-                            id={"type": "filter-variable", "index": n_clicks},
-                            options=[
-                                {"label": "Days from Implantation", "value": "Days"},
-                                {
-                                    "label": "Independent Variable",
-                                    "value": "X dimension",
-                                },
-                                {"label": "Reference Pulse Width", "value": "Ref PW"},
-                            ],
-                        ),
-                        html.H6("Value:"),
-                        html.Div(id={"type": "data-selector", "index": n_clicks}),
-                        dbc.Button(
-                            "Remove Filter",
-                            id={"type": "remove_btn", "index": n_clicks},
-                        ),
-                    ],
-                    id={"type": "filter", "index": n_clicks},
-                    className="filter",
-                    style={"width": "18rem"},
-                )
-            )
+            new_filter = plot.create_filter(index)
             children.append(new_filter)
         else:
             del children[remove_clicks.index(1)]
+    else:
+        children = [
+            plot.create_filter(1, "value", "X dimension"),
+            plot.create_filter(2, "value", "Ref PW"),
+            plot.create_filter(3, "value", "Electrode Config"),
+        ]
     return children
 
 
@@ -320,6 +279,7 @@ def assign_filter_variable(filter_type):
             {"label": "Independent Variable", "value": "X dimension"},
             {"label": "Reference Pulse Width", "value": "Ref PW"},
             {"label": "Electrode Configuration", "value": "Electrode Config"},
+            {"label": "Baseline Stimulus", "value": "base"},
         ]
     else:
         options = []
@@ -379,6 +339,14 @@ def assign_data_selector(filter_variable, id):
             },
             labelStyle={"display": "block"},
         )
+    elif filter_variable == "base":
+        return dcc.Slider(
+            id={"type": "filter-values", "value-type": "slider", "index": id["index"]},
+            min=0,
+            # max=max_const_var,
+            step=None,
+            included=False,
+        )
     else:
         return []
 
@@ -418,7 +386,6 @@ def set_value_options(filter_var):
         min_value = min(values)
         most_common_value = max(set(values), key=values.count)
         const_var_marks = {str(val): str(val) for val in set(values)}
-        print(const_var_marks, max_value, min_value, most_common_value)
         return const_var_marks, max_value, min_value, most_common_value
 
 

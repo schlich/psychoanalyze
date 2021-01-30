@@ -266,6 +266,14 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "datatest"
+version = "0.9.6"
+description = "Test driven data-wrangling and data validation."
+category = "dev"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "decorator"
 version = "4.4.2"
 description = "Decorators for Humans"
@@ -1543,7 +1551,7 @@ pandas = ">=0.25"
 [metadata]
 lock-version = "1.1"
 python-versions = "3.8.6"
-content-hash = "21186249861d79d1bcae2217d21a6d70135beb37046fa4676c51cd6e153c8637"
+content-hash = "1e02017536855a74ca6e53afb6b2ddd4e55df6d77453d77a46b5ef7caac629c3"
 
 [metadata.files]
 appdirs = [
@@ -1706,6 +1714,10 @@ dash-renderer = [
 ]
 dash-table = [
     {file = "dash_table-4.11.0.tar.gz", hash = "sha256:3170504a8626a9676b016c5ab456ab8c1fb1ea0206dcc2eddb8c4c6589216304"},
+]
+datatest = [
+    {file = "datatest-0.9.6-py2.py3-none-any.whl", hash = "sha256:bfcd89c434c319c2b0ec2d1157ef352ba0ec77b3482e087903e9bb88dbf82bc0"},
+    {file = "datatest-0.9.6.tar.gz", hash = "sha256:866006f1e869ba3806d852cb0722583f1eea04f79e7732d021059a1be423c9f8"},
 ]
 decorator = [
     {file = "decorator-4.4.2-py2.py3-none-any.whl", hash = "sha256:41fa54c2a0cc4ba648be4fd43cff00aedf5b9465c9bf18d64325bc225f08f760"},
