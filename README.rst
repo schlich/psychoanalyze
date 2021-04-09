@@ -1,5 +1,5 @@
 Psychoanalyze
-========
+=============
 
 "Tools for handling, analyzing, and visualizing psychophysics data."
 
