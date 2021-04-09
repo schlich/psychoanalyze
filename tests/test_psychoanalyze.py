@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from hypothesis import given, settings, assume
-from hypothesis.strategies import floats, lists, text
+from hypothesis.strategies import floats, lists, text, composite
 from hypothesis.extra.pandas import data_frames, columns
 
 
@@ -20,10 +20,10 @@ def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assert isinstance(fig, go.Figure)
     assert "Reference" in fig.layout.xaxis.title.text
     assert "Threshold" in fig.layout.yaxis.title.text
-
-
-@given(data.WeberFig.schema.strategy())
-@settings(deadline=None)
-def test_plot_one_trace_for_each_subject(df):
-    fig = data.WeberFig(df)
     assert len(fig.data) == len(df.index.unique())
+
+
+# @given(data.WeberFig.schema.strategy())
+# @settings(deadline=None)
+# def test_plot_one_trace_for_each_subject(df):
+#     fig = data.WeberFig(df)
