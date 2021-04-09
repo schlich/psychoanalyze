@@ -23,6 +23,7 @@ def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
 
 
 @given(data.WeberFig.schema.strategy())
+@settings(deadline=None)
 def test_plot_one_trace_for_each_subject(df):
     fig = data.WeberFig(df)
-    assert len(fig.data) == len(df)
+    assert len(fig.data) == len(df.index.unique())
