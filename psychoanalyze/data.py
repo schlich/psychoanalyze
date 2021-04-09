@@ -3,8 +3,8 @@ import pandas as pd
 
 
 class WeberFig:
-    def __new__(cls, curve_df=None):
-        if curve_df.empty:
+    def __new__(cls, df=None, x_var="ACR"):
+        if df.empty:
             return px.scatter()
         else:
-            return px.scatter(curve_df, x="Reference Charge", y="Threshold Charge")
+            return px.scatter(df, x="Reference ACR", y="Threshold ACR", color=df.index)
