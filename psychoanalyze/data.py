@@ -7,4 +7,4 @@ class WeberFig:
         if curve_df.empty:
             return px.scatter()
         else:
-            return px.scatter(curve_df)
+            return px.scatter(curve_df, x="Reference Charge", y="Threshold Charge")
