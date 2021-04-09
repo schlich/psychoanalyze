@@ -1,14 +1,19 @@
 [tool.poetry]
-name = "psychoanalyze2"
+name = "psychoanalyze"
 version = "0.1.0"
-description = ""
+description = "Tools for handling, analyzing, and visualizing psychophysics data."
 authors = ["Tyler Schlichenmeyer <tyler.schlichenmeyer@gmail.com>"]
+license = "MIT"
+readme = "README.rst"
+
 
 [tool.poetry.dependencies]
 python = "^3.9"
+plotly = "^4.14.3"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
+black = {version = "^20.8b1", allow-prereleases = true}
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
