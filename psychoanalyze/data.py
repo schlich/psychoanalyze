@@ -17,5 +17,5 @@ class WeberFig:
             "Reference ACR": Column(pa.Float),
             "Threshold ACR": Column(pa.Float),
         },
-        index=Index(pandas_dtype=str, allow_duplicates=False),
+        index=Index(pandas_dtype=str, name="Subject"),
     )
