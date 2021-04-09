@@ -12,11 +12,7 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-@given(
-    data_frames(
-        columns(names_or_number=["Reference ACR", "Threshold ACR"], elements=floats())
-    )
-)
+@given(data.WeberFig.schema.strategy())
 @settings(deadline=None)
 def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assume(len(df))
@@ -26,12 +22,7 @@ def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assert "Threshold" in fig.layout.yaxis.title.text
 
 
-@given(
-    data_frames(
-        columns(names_or_number=["Reference ACR", "Threshold ACR"], elements=floats()),
-        index=lists(text(min_size=1), min_size=1, unique=True),
-    )
-)
+@given(data.WeberFig.schema.strategy())
 def test_plot_one_trace_for_each_subject(df):
     fig = data.WeberFig(df)
     assert len(fig.data) == len(df)
