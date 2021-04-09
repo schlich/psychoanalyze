@@ -1,0 +1,8 @@
+{
+    "restructuredtext.confPath": "",
+    "python.formatting.provider": "black",
+    "files.associations": {
+        "*.toml": "ini",
+    },
+    "python.pythonPath": ".env/bin/python3.9",
+}
