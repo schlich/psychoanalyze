@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import plotly.express as px
 import pandas as pd
 import pandera as pa
@@ -19,3 +20,14 @@ class WeberFig:
         },
         index=Index(pandas_dtype=str, name="Subject"),
     )
+
+
+@dataclass
+class PulseTrain:
+    amp: float
+    pw: float
+    freq: float
+    dur: float
+
+    def acr(self, q_thresh):
+        return ((self.amp * self.dur) - q_thresh) * self.freq
