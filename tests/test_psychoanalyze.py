@@ -4,8 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from hypothesis import given, settings, assume, note
-from hypothesis.strategies import floats, lists, text, composite
-from hypothesis.extra.pandas import data_frames, columns
+from hypothesis.strategies import builds, integers, floats
 
 
 def test_version():
@@ -16,6 +15,7 @@ def test_version():
 @settings(deadline=None)
 def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assume(len(df))
+    note(df.index)
     note(df.index.unique())
     fig = data.WeberFig(df)
     note(fig.data)
@@ -25,7 +25,16 @@ def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assert len(fig.data) == len(df.index.unique())
 
 
-def test_acr_calculation():
-    q_thresh = 500
-    pulse = data.PulseTrain(amp=100, pw=200, freq=50, dur=500)
-    assert pulse.acr(q_thresh) == ((pulse.amp * pulse.dur) - q_thresh) * 50
+@given(
+    integers(),
+    builds(
+        data.PulseTrain,
+        amp=floats(allow_infinity=False, allow_nan=False),
+        pw=floats(allow_infinity=False, allow_nan=False),
+        freq=floats(allow_infinity=False, allow_nan=False),
+        dur=floats(allow_infinity=False, allow_nan=False),
+    ),
+)
+def test_acr_calculation(q_thresh, pulse):
+    assume(q_thresh)
+    assert pulse.acr(q_thresh) == ((pulse.amp * pulse.dur) - q_thresh) * pulse.freq
