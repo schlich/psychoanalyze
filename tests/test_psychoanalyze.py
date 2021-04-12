@@ -51,7 +51,7 @@ def test_calculate_reference_acr(ref_amp, ref_pw):
 
 
 @given(data.Curve.schema.strategy(size=5))
-def test_calculate_acr_for_WeberFig_dataframe(curve_df):
+def test_calculate_ref_charge_for_WeberFig_dataframe(curve_df):
     assume(curve_df.index.is_unique)
     ref_amps = curve_df.index.get_level_values("Ref Amp")
     ref_pws = curve_df.index.get_level_values("Ref PW")

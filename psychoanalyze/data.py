@@ -23,7 +23,7 @@ class WeberFig:
                 self.df.reset_index(),
                 x="Reference ACR",
                 y="Threshold ACR",
-                color="Subject",
+                color="Monkey",
             )
 
     schema = DataFrameSchema(
@@ -33,7 +33,7 @@ class WeberFig:
         },
         index=MultiIndex(
             [
-                Index(str, name="Subject"),
+                Index(str, name="Monkey"),
                 Index(float, name="Ref Amp"),
                 Index(float, name="Ref PW"),
             ]
