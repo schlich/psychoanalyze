@@ -96,6 +96,13 @@ class Curve:
     def ref_acr(self):
         return self.ref_pulse_train.q - self.q_thresh
 
+    @property
+    def exp_type(self):
+        if self.ref_pulse_train.amp == 0 or self.ref_pulse_train.pw == 0:
+            return "Detection"
+        else:
+            return "Discrimination"
+
 
 class Session:
     def __init__(self, *, monkey=None, date=None):
@@ -110,3 +117,31 @@ class Session:
     @property
     def curves(self):
         return Curve().df
+
+
+class CurveDF:
+    def __init__(self, df):
+        self.df = df
+
+    @property
+    def acr(self):
+        df = self.df
+        df["Experiment Type"] = "Detection"
+        df["Threshold Charge"] = df["location"] * df["base"]
+        df["Session Threshold Charge"] = df["Threshold Charge"]
+        df["Difference Threshold Charge"] = df["Threshold Charge"]
+        df["Absolute Threshold Charge"] = df["Session Threshold Charge"]
+        df["ACR"] = (
+            df["Difference Threshold Charge"] - df["Absolute Threshold Charge"]
+        ) * 50
+        return df
+
+    @property
+    def exp_type(self):
+        df = self.df
+        df["Ref Charge"] = df.index.get_level_values(
+            "Ref Amp"
+        ) * df.index.get_level_values("Ref PW")
+        df.loc[df["Ref Charge"] == 0, "Experiment Type"] = "Detection"
+        df.loc[df["Ref Charge"] != 0, "Experiment Type"] = "Discrimination"
+        return df

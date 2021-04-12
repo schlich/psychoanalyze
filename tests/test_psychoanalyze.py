@@ -60,3 +60,28 @@ def test_calculate_charge_values_for_WeberFig_dataframe(curve_df):
     weber_df = data.WeberFig(df=curve_df, dim="Charge").df
     validate(weber_df["Reference Charge"].to_list(), ref_charges.to_list())
     validate(weber_df["Threshold Charge"].to_list(), thresh_charges.to_list())
+
+
+@given(data.Curve.schema.strategy(size=5))
+def test_acr_calculation_for_dataframe(df):
+    df = data.CurveDF(df).acr
+    detection_df = df[df["Experiment Type"] == "Detection"]
+    discrim_df = df[df["Experiment Type"] == "Discrimination"]
+    assert not detection_df["ACR"].all()
+    assert discrim_df["ACR"].all()
+
+
+def test_experiment_type_calculation():
+    ref_pulse_train = data.PulseTrain(amp=0, pw=0, freq=50, dur=500)
+    curve = data.Curve(ref_pulse_train)
+    assert curve.exp_type == "Detection"
+    ref_pulse_train = data.PulseTrain(amp=5, pw=4, freq=50, dur=500)
+    curve = data.Curve(ref_pulse_train)
+    assert curve.exp_type == "Discrimination"
+
+
+def test_experiment_type_for_df():
+    index = pd.MultiIndex.from_tuples([(0, 1), (1, 1)], names=["Ref Amp", "Ref PW"])
+    df = pd.DataFrame(index=index)
+    df = data.CurveDF(df).exp_type
+    validate(df["Experiment Type"].to_list(), ["Detection", "Discrimination"])
