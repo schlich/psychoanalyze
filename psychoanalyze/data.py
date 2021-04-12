@@ -10,19 +10,19 @@ class WeberFig:
         ref_amps = df.index.get_level_values("Ref Amp")
         ref_pws = df.index.get_level_values("Ref PW")
         df[f"Reference {dim}"] = ref_amps * ref_pws
-        df[f"Threshold {dim}"] = 0
+        df[f"Threshold {dim}"] = df["location"] * df["base"]
         self.df = df
         self.x = f"Reference {dim}"
         self.y = f"Threshold {dim}"
 
-    def plot(self):
+    def plot(self, dim=None):
         if self.df.empty:
             return px.scatter()
         else:
             return px.scatter(
                 self.df.reset_index(),
-                x="Reference ACR",
-                y="Threshold ACR",
+                x=f"Reference {dim}",
+                y=f"Threshold {dim}",
                 color="Monkey",
             )
 
@@ -58,7 +58,14 @@ class PulseTrain:
 
 class Curve:
     schema = DataFrameSchema(
-        index=MultiIndex([Index(float, name="Ref Amp"), Index(float, name="Ref PW")])
+        {"location": Column(float), "base": Column(float)},
+        index=MultiIndex(
+            [
+                Index(float, name="Ref Amp"),
+                Index(float, name="Ref PW"),
+                Index(float, name="Monkey"),
+            ]
+        ),
     )
 
     def __init__(self, ref_pulse_train=None, location=0, base=0, dimension="amp"):

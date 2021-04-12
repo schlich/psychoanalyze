@@ -13,7 +13,7 @@ def test_version():
     assert __version__ == "0.1.0"
 
 
-@given(data.WeberFig.schema.strategy())
+@given(data.Curve.schema.strategy())
 @settings(deadline=None)
 def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assume(len(df))
@@ -51,10 +51,12 @@ def test_calculate_reference_acr(ref_amp, ref_pw):
 
 
 @given(data.Curve.schema.strategy(size=5))
-def test_calculate_ref_charge_for_WeberFig_dataframe(curve_df):
+def test_calculate_charge_values_for_WeberFig_dataframe(curve_df):
     assume(curve_df.index.is_unique)
     ref_amps = curve_df.index.get_level_values("Ref Amp")
     ref_pws = curve_df.index.get_level_values("Ref PW")
     ref_charges = ref_amps * ref_pws
+    thresh_charges = curve_df["location"] * curve_df["base"]
     weber_df = data.WeberFig(df=curve_df, dim="Charge").df
     validate(weber_df["Reference Charge"].to_list(), ref_charges.to_list())
+    validate(weber_df["Threshold Charge"].to_list(), thresh_charges.to_list())
