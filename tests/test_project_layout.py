@@ -9,9 +9,12 @@ def test_data_exists():
     assert os.path.isfile("data/data.h5")
 
 
-@given(lists(text()))
-def test_create_hd5_from_csvs(csv_file_list):
-    csv_name_list = [file.stem for file in Path("data/csv").iterdir()]
+def test_tables_in_hdf_keys():
+    # csv_name_list = [file.stem for file in Path("data/csv").iterdir()]
     with pd.HDFStore("data/data.h5") as hdf:
         hdf_table_list = hdf.keys()
-    assert hdf_table_list == csv_name_list
+    assert "/curves" in hdf_table_list
+
+
+def test_tables_in_csv_folder():
+    assert "curves" in [file.stem for file in Path("data/csv").iterdir()]
