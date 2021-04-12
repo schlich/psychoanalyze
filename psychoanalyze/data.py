@@ -2,23 +2,42 @@ from dataclasses import dataclass
 import plotly.express as px
 import pandas as pd
 import pandera as pa
-from pandera import DataFrameSchema, Column, String
-from pandera.schema_components import Index
+from pandera import DataFrameSchema, Column, Index, MultiIndex
 
 
 class WeberFig:
-    def __new__(cls, df=None, x_var="ACR"):
-        if df.empty:
+    def __init__(self, df=pd.DataFrame(), dim=None):
+        ref_amps = df.index.get_level_values("Ref Amp")
+        ref_pws = df.index.get_level_values("Ref PW")
+        df[f"Reference {dim}"] = ref_amps * ref_pws
+        df[f"Threshold {dim}"] = 0
+        self.df = df
+        self.x = f"Reference {dim}"
+        self.y = f"Threshold {dim}"
+
+    def plot(self):
+        if self.df.empty:
             return px.scatter()
         else:
-            return px.scatter(df, x="Reference ACR", y="Threshold ACR", color=df.index)
+            return px.scatter(
+                self.df.reset_index(),
+                x="Reference ACR",
+                y="Threshold ACR",
+                color="Subject",
+            )
 
     schema = DataFrameSchema(
         columns={
             "Reference ACR": Column(pa.Float),
             "Threshold ACR": Column(pa.Float),
         },
-        index=Index(pandas_dtype=str, name="Subject"),
+        index=MultiIndex(
+            [
+                Index(str, name="Subject"),
+                Index(float, name="Ref Amp"),
+                Index(float, name="Ref PW"),
+            ]
+        ),
     )
 
 
@@ -38,10 +57,15 @@ class PulseTrain:
 
 
 class Curve:
-    def __init__(self, location=0, base=0, dimension="amp"):
+    schema = DataFrameSchema(
+        index=MultiIndex([Index(float, name="Ref Amp"), Index(float, name="Ref PW")])
+    )
+
+    def __init__(self, ref_pulse_train=None, location=0, base=0, dimension="amp"):
         self.location = location
         self.base = base
         self.dimension = dimension
+        self.ref_pulse_train = ref_pulse_train
 
     @property
     def thresh_pulse(self):
@@ -59,9 +83,11 @@ class Curve:
         return thresh_pulse.pw * thresh_pulse.amp
 
     @classmethod
-    def load(self):
-        # return pd.read_hdf("data/data.h5", "curves")
-        return pd.DataFrame()
+    def load(cls):
+        return pd.read_hdf("data/data.h5", "curves")
+
+    def ref_acr(self):
+        return self.ref_pulse_train.q - self.q_thresh
 
 
 class Session:
