@@ -2,3 +2,5 @@
 .env/
 .hypothesis/
 .ipynb_checkpoints/
+.coverage
+.pytest-runtimes

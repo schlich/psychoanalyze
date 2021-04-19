@@ -1,12 +1,19 @@
+import pytest
+from datetime import date
 from pandas.io.formats.format import get_level_lengths
 from psychoanalyze import __version__
 from psychoanalyze import data
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from hypothesis import given, settings, assume, note
+from hypothesis import given, settings, assume, note, Phase
 from hypothesis.strategies import builds, integers, floats
 from datatest import validate
+
+
+@pytest.fixture
+def curve_df():
+    return data.Curve.schema.example(size=20)
 
 
 def test_version():
@@ -14,7 +21,7 @@ def test_version():
 
 
 @given(data.Curve.schema.strategy())
-@settings(deadline=None)
+@settings(deadline=None, phases=[Phase.reuse])
 def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     assume(len(df))
     assume(len(df.index.unique() != len(df.index)))
@@ -25,63 +32,97 @@ def test_WeberFig_creation_returns_plotly_figure_w_axes(df):
     # assert len(fig.data) == len(df.index.unique())
 
 
-def test_get_curve_threshold_charge():
-    ref_pulse_train = data.PulseTrain(amp=20, pw=50, freq=50, dur=400)
-    curve = data.Curve(ref_pulse_train=ref_pulse_train)
-    assert curve.q_thresh == curve.thresh_pulse.pw * curve.thresh_pulse.amp
-
-
-def test_construct_thresh_pulse():
-    curve = data.Curve(location=100, base=200, dimension="amp")
-    assert curve.thresh_pulse == data.PulseTrain(amp=100, pw=200, freq=50, dur=500)
-
-
 def test_load_curves_returns_dataframe():
-    assert isinstance(data.Curve.load(), pd.DataFrame)
-
-
-@given(
-    floats(allow_nan=False, allow_infinity=False),
-    floats(allow_nan=False, allow_infinity=False),
-)
-def test_calculate_reference_acr(ref_amp, ref_pw):
-    ref_pulse_train = data.PulseTrain(amp=ref_amp, pw=ref_pw, freq=50, dur=500)
-    curve = data.Curve(ref_pulse_train)
-    assert curve.ref_acr() == ref_pulse_train.q - curve.q_thresh
+    assert isinstance(data.Curve().df, pd.DataFrame)
 
 
 @given(data.Curve.schema.strategy(size=5))
+@settings(phases=[Phase.reuse])
 def test_calculate_charge_values_for_WeberFig_dataframe(curve_df):
     assume(curve_df.index.is_unique)
     ref_amps = curve_df.index.get_level_values("Ref Amp")
     ref_pws = curve_df.index.get_level_values("Ref PW")
-    ref_charges = ref_amps * ref_pws
-    thresh_charges = curve_df["location"] * curve_df["base"]
+    curve_df["Reference Charge"] = ref_amps * ref_pws
+    curve_df["Threshold Charge"] = curve_df["location"] * curve_df["base"]
     weber_df = data.WeberFig(df=curve_df, dim="Charge").df
-    validate(weber_df["Reference Charge"].to_list(), ref_charges.to_list())
-    validate(weber_df["Threshold Charge"].to_list(), thresh_charges.to_list())
+    validate(weber_df["Threshold Charge"], curve_df["Threshold Charge"])
+    validate(weber_df["Reference Charge"], curve_df["Reference Charge"])
 
 
 @given(data.Curve.schema.strategy(size=5))
+# @settings(phases=[Phase.reuse])
 def test_acr_calculation_for_dataframe(df):
     df = data.CurveDF(df).acr
-    detection_df = df[df["Experiment Type"] == "Detection"]
-    discrim_df = df[df["Experiment Type"] == "Discrimination"]
-    assert not detection_df["ACR"].all()
-    assert discrim_df["ACR"].all()
 
 
 def test_experiment_type_calculation():
-    ref_pulse_train = data.PulseTrain(amp=0, pw=0, freq=50, dur=500)
-    curve = data.Curve(ref_pulse_train)
-    assert curve.exp_type == "Detection"
-    ref_pulse_train = data.PulseTrain(amp=5, pw=4, freq=50, dur=500)
-    curve = data.Curve(ref_pulse_train)
-    assert curve.exp_type == "Discrimination"
+    pass
 
 
 def test_experiment_type_for_df():
     index = pd.MultiIndex.from_tuples([(0, 1), (1, 1)], names=["Ref Amp", "Ref PW"])
     df = pd.DataFrame(index=index)
-    df = data.CurveDF(df).exp_type
+    df["Experiment Type"] = data.CurveDF(df).exp_type
     validate(df["Experiment Type"].to_list(), ["Detection", "Discrimination"])
+
+
+def test_WeberFig_pooling(curve_df):
+    df = curve_df
+    weber_fig = data.WeberFig(df, dim="Charge", pool=True)
+    assert "std" in weber_fig.df.columns
+    assert "count" in weber_fig.df.columns
+
+
+def test_WeberFig_data_prep_calculates_groups(curve_df):
+    df = curve_df
+    weber_fig = data.WeberFig(
+        df=df, dim="Charge", pool=False, groupby="Independent Variable"
+    )
+    assert "Independent Variable" in weber_fig.df.columns
+
+
+def test_pooling_leaves_relevant_columns(curve_df):
+    df = curve_df
+    weber_fig = data.WeberFig(
+        df=df, dim="Charge", pool=True, groupby="Independent Variable"
+    )
+    assert "Independent Variable" in weber_fig.df.columns
+
+
+def test_WeberFig_data_prep_not_empty_for_nonempty_df(curve_df):
+    assert len(data.WeberFig(df=curve_df, dim="Charge").df)
+
+
+def test_independent_variable_calculation_from_pulses():
+    pulses = pd.DataFrame(
+        [{"Amplitude": 10, "Pulse Width": 50}, {"Amplitude": 20, "Pulse Width": 50}]
+    )
+    assert data.ind_var(pulses) == "Amplitude"
+    pulses = pd.DataFrame(
+        [{"Amplitude": 10, "Pulse Width": 50}, {"Amplitude": 10, "Pulse Width": 10}]
+    )
+    assert data.ind_var(pulses) == "Pulse Width"
+
+
+def test_points():
+    points = data.Points.schema.example(size=30)
+    assert "Amp2" in points.index.names
+
+
+def test_curve_df_points(curve_df):
+    points = data.CurveDF(curve_df).points
+    assert "Amp2" in points.index.names
+
+
+def test_points_acr():
+    points = pd.DataFrame(
+        {"Comp Current": [1, 2, 3, 4, 5], "Q_thresh": [6, 7, 8, 9, 10]}
+    )
+    validate(
+        data.Points(points).acr, (points["Comp Current"] - points["Q_thresh"]) * 50
+    )
+
+
+def test_split_points_into_curves():
+    points = data.Points.schema.example(size=30)
+    assert len(points)

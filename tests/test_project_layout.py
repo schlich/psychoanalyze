@@ -13,7 +13,7 @@ def test_tables_in_hdf_keys():
     # csv_name_list = [file.stem for file in Path("data/csv").iterdir()]
     with pd.HDFStore("data/data.h5") as hdf:
         hdf_table_list = hdf.keys()
-    assert "/curves" in hdf_table_list
+    assert "/trials" in hdf_table_list
 
 
 def test_tables_in_csv_folder():
