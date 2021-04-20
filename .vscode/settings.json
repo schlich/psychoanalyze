@@ -1,10 +1,8 @@
 {
-    "restructuredtext.confPath": "",
     "python.formatting.provider": "black",
     "files.associations": {
         "*.toml": "ini",
     },
-    "python.pythonPath": ".env/bin/python3.9",
     "python.linting.flake8Enabled": true,
     "python.linting.enabled": true,
     "python.linting.flake8Args": [
@@ -16,4 +14,5 @@
     "python.testing.unittestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.pytestEnabled": true,
+    "python.pythonPath": "/home/tyler/.cache/pypoetry/virtualenvs/psychoanalyze-zEU_a_jI-py3.9/bin/python",
 }

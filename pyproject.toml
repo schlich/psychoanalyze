@@ -8,18 +8,19 @@ readme = "README.rst"
 
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.9.1"
 plotly = "^4.14.3"
 pandas = "^1.2.3"
-pandera = "^0.6.3"
+pandera = {extras = ["all"], version = "^0.6.3"}
 tables = "^3.6.1"
 hypothesis = "^6.9.0"
 datatest = "^0.11.1"
 dash = "^1.20.0"
 jupyterlab = "^3.0.14"
+psignifit = {git = "https://github.com/wichmann-lab/python-psignifit.git"}
 
 [tool.poetry.dev-dependencies]
-pytest = "^5.2"
+pytest = "^6.2.3"
 black = {version = "^20.8b1", allow-prereleases = true}
 flake8 = "^3.9.0"
 mypy = "^0.812"
@@ -30,3 +31,8 @@ pytest-cov = "^2.11.1"
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = ["tests"]
