@@ -2,6 +2,7 @@ from collections import namedtuple
 from dataclasses import dataclass
 import plotly.graph_objects as go
 import pandas as pd
+import pandas_flavor as pf
 from pandera import DataFrameSchema, Column, Index, MultiIndex, Check
 
 pd.options.plotting.backend = "plotly"
@@ -70,10 +71,10 @@ curve_index_info = session_index_info + [
     Level("Dur1", float, Check.ge(0)),
     Level("Active Channels", int, Check.in_range(0, 255)),
     Level("Return Channels", int, Check.in_range(0, 255)),
-    Level("X Dimension", str, Check.isin(["Amp", "PW"])),
 ]
 session_index_schema = [Index(**level._asdict()) for level in session_index_info]
 curve_index_schema = [Index(**level._asdict()) for level in curve_index_info]
+weber_index_schema = curve_index_schema
 curve_level_names = [level.name for level in curve_index_info]
 
 CurveIndex = namedtuple(
@@ -277,7 +278,8 @@ class Points:
 @pd.api.extensions.register_dataframe_accessor("curves")
 class Curves:
     def __init__(self, df, points=None, dim=None):
-        self._df = self.schema.validate(df)
+        self._df = df
+        self.dim = dim
 
     schema = DataFrameSchema(
         columns={
@@ -302,6 +304,7 @@ class Curves:
             "Width2": Column(float, nullable=True),
         },
         index=MultiIndex(curve_index_schema),
+        strict=False,
     )
 
     @property
@@ -358,18 +361,25 @@ class Curves:
         points = Points().df
         return df.join(points)
 
-    def label_thresholds(self):
-        df = self._df
-        amp_idx = pd.IndexSlice[:, :, :, :, :, :, :, :, "Amp"]
-        df.loc[amp_idx, "Threshold Amp"] = df.loc[amp_idx, "location"]
-        df.loc[amp_idx, "Threshold PW"] = df.loc[amp_idx, "Width2"]
-        pw_idx = pd.IndexSlice[:, :, :, :, :, :, :, :, "PW"]
-        df.loc[pw_idx, "Threshold Amp"] = df.loc[pw_idx, "Amp2"]
-        df.loc[pw_idx, "Threshold PW"] = df.loc[pw_idx, "location"]
+    def filter_dimension(self, dim):
+        return self._df.xs(dim, level="X Dimension")
+
+    @pf.register_dataframe_method
+    def assign_axes(self, dim):
+        df = self
+        if dim == "Amp":
+            df["Threshold Amp"] = df["location"]
+            df["Threshold PW"] = df["Width2"]
+        else:
+            df["Threshold Amp"] = df["Amp2"]
+            df["Threshold PW"] = df["location"]
+        df["Reference Amp"] = df.index.get_level_values("Amp1")
+        df["Reference PW"] = df.index.get_level_values("Width1")
         return df
 
     def weber(self, dim):
-        return self._df
+        df = self.filter_dimension(dim).assign_axes(dim)
+        return df
 
 
 class Session:
@@ -404,8 +414,7 @@ def session_abs_thresh_q(session_df):
 class WeberFig:
     def __init__(self, dim):
         df = pd.read_hdf("data/data.h5", "curves")
-        df = df.curves.weber(dim)
-        self.df = df.reset_index()  # needed until plotly accepts mulitiindex
+        self.df = df.curves.weber(dim)
 
     def plot(self):
         return self.df.plot()
@@ -422,18 +431,13 @@ class WeberFig:
         #         # size="count",
         #     )
 
-    schema = DataFrameSchema(
-        columns={
-            "Reference ACR": Column(float),
-            "Threshold ACR": Column(float),
-            "Reference Charge": Column(float),
-            "Threshold Charge": Column(float),
-        },
-        index=MultiIndex(
-            [
-                Index(str, name="Monkey"),
-                Index(float, name="Ref Amp"),
-                Index(float, name="Ref PW"),
-            ]
-        ),
-    )
+    @property
+    def schema(self):
+        schema = DataFrameSchema(
+            columns={
+                f"Reference {self.dim}": Column(float),
+                f"Threshold {self.dim}": Column(float),
+            },
+            index=MultiIndex(weber_index_schema),
+        )
+        return schema

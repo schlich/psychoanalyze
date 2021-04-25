@@ -1,4 +1,5 @@
 from hypothesis.strategies import composite
+from hypothesis.strategies._internal.core import sampled_from
 from psychoanalyze.data import Curves, Points, WeberFig
 from psychoanalyze.factories import CurveFactory
 import pandas as pd
@@ -61,24 +62,23 @@ def test_WeberFig_initialize(curves):
     WeberFig(dim="Amp")
 
 
-def test_thresh_labels(amp_curve, pw_curve):
-    curves = Curves(pd.concat([amp_curve, pw_curve]))
-    df = curves.label_thresholds()
-    amp_df = df.xs("Amp", level="X Dimension")
-    pw_df = df.xs("PW", level="X Dimension")
-    assert amp_df["Threshold Amp"].equals(amp_df["location"])
-    assert amp_df["Threshold PW"].equals(amp_df["Width2"])
-    assert pw_df["Threshold Amp"].equals(pw_df["Amp2"])
-    assert pw_df["Threshold PW"].equals(pw_df["location"])
+@pytest.mark.parametrize("dim", ["Amp", "PW"])
+def test_assign_axes(dim, amp_curve, pw_curve):
+    if dim == "Amp":
+        curves = amp_curve
+    else:
+        curves = pw_curve
+    df = curves.assign_axes(dim)
+    assert df[f"Threshold {dim}"].equals(df["location"])
+
+
+def test_weber_data_prep(amp_curve):
+    amp_curve.curves.weber("Amp")
 
 
 # def test_fit_curves(points):
 #     curves = points.fit_curves(dim="Amp")
 #     data.Curves.schema.validate(curves)
-
-
-def test_WeberFig_plot():
-    WeberFig(dim="Amp")
 
 
 # def test_acr_calculation_for_dataframe(curves):
@@ -111,10 +111,6 @@ def test_WeberFig_plot():
 #         curves, dim="Charge", pool=True, groupby="Independent Variable"
 #     )
 #     assert "Independent Variable" in weber_fig.df.columns
-
-
-# def test_WeberFig_data_prep_not_empty_for_nonempty_df(curves):
-#     assert len(WeberFig(dim="Charge").df)
 
 
 # def test_independent_variable_calculation_from_points():
