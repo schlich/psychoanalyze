@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 import pandas as pd
-from hypothesis import given
-from hypothesis.strategies import lists, text
 
 
 def test_data_exists():

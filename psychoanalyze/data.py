@@ -1,10 +1,9 @@
+from collections import namedtuple
 from dataclasses import dataclass
-from datetime import date, datetime
 import plotly.express as px
 import plotly.graph_objects as go
 import pandas as pd
-import pandera as pa
-from pandera import DataFrameSchema, Column, Index, MultiIndex
+from pandera import DataFrameSchema, Column, Index, MultiIndex, Check
 
 axis_settings = {
     "ticks": "outside",
@@ -57,58 +56,62 @@ symbol_map = {
     "Multipolar": "circle-open",
     "Monopolar": "circle",
 }
+Level = namedtuple("Level", ["name", "pandas_dtype", "checks"])
+
+session_index_info = [
+    Level("Monkey", str, Check.isin(["U", "Y", "Z"])),
+    Level("Date", "datetime64[ns]", None),
+]
+curve_index_info = session_index_info + [
+    Level("Amp1", float, Check.ge(0)),
+    Level("Width1", float, Check.ge(0)),
+    Level("Freq1", float, Check.ge(0)),
+    Level("Dur1", float, Check.ge(0)),
+    Level("Active Channels", int, Check.in_range(0, 255)),
+    Level("Return Channels", int, Check.in_range(0, 255)),
+    Level("X Dimension", str, Check.isin(["Amp", "PW"])),
+]
+session_index_schema = [Index(**level._asdict()) for level in session_index_info]
+curve_index_schema = [Index(**level._asdict()) for level in curve_index_info]
+curve_level_names = [level.name for level in curve_index_info]
+
+CurveIndex = namedtuple(
+    "CurveIndex",
+    [
+        "monkey",
+        "date",
+        "amp1",
+        "width1",
+        "freq1",
+        "dur1",
+        "active_channels",
+        "return_channels",
+        "x_dimension",
+    ],
+)
+CurveColumns = namedtuple(
+    "CurveColumns",
+    [
+        "false_alarms",
+        "correct_rejections",
+        "location",
+        "width",
+        "gamma",
+        "lambda_",
+        "beta",
+        "location_CI_95",
+        "width_CI_95",
+        "gamma_CI_95",
+        "lambda_CI_95",
+        "beta_CI_95",
+        "amp2",
+        "width2",
+    ],
+)
 
 
-class WeberFig:
-    def __init__(self, df=pd.DataFrame(), dim=None, pool=True, groupby=None):
-        if df.empty:
-            df = Curve.load()
-        curve_df = CurveDF(df)
-        if dim == "Charge":
-            df["Reference Charge"] = curve_df.ref_charge
-            df["Threshold Charge"] = curve_df.thresh_charge
-        df["Independent Variable"] = curve_df.ind_var
-        self.x = f"Reference {dim}"
-        self.y = f"Threshold {dim}"
-        if pool:
-            df = (
-                df.groupby(["Monkey", "Independent Variable", self.x])[self.y]
-                .agg(["mean", "std", "count"])
-                .rename(columns={"mean": self.y})
-            )
-        self.df = df.reset_index()
-        self.groupby = groupby
-
-    def plot(self):
-        df = self.df
-        if df.empty:
-            return px.scatter()
-        else:
-            return px.scatter(
-                df.reset_index(),
-                x=self.x,
-                y=self.y,
-                color="Monkey",
-                symbol=self.groupby,
-                template=template,
-                size="count",
-            )
-
-    schema = DataFrameSchema(
-        columns={
-            "Reference ACR": Column(pa.Float),
-            "Threshold ACR": Column(pa.Float),
-            "Reference Charge": Column(pa.Float),
-            "Threshold Charge": Column(pa.Float),
-        },
-        index=MultiIndex(
-            [
-                Index(str, name="Monkey"),
-                Index(float, name="Ref Amp"),
-                Index(float, name="Ref PW"),
-            ]
-        ),
-    )
+def get_index(df, level):
+    return df.index.get_level_values(level)
 
 
 @dataclass
@@ -126,49 +129,246 @@ class PulseTrain:
     #     return (self.q - q_thresh) * self.freq
 
 
-class Curve:
+class Trials:
+    def __init__(self):
+        self.df = pd.read_hdf("data/data.h5", "trials")
+
     schema = DataFrameSchema(
-        {
-            "location": Column(float),
-            "base": Column(float),
+        columns={
+            "Result": Column(int),
         },
         index=MultiIndex(
-            [
-                Index(float, name="Monkey"),
-                Index("datetime64[ns]", name="Date"),
-                Index(float, name="Ref Amp"),
-                Index(float, name="Ref PW"),
+            curve_index_schema
+            + [
+                Index(float, name="Amp2"),
+                Index(float, name="Width2"),
+                Index(float, name="Freq2"),
+                Index(float, name="Dur2"),
+                Index(int, name="Trial ID"),
             ]
         ),
+        coerce=True,
+        strict="filter",
     )
 
+
+class Points:
     def __init__(self, df=pd.DataFrame()):
-        self.df = df
-
-    @property
-    def thresh_pulse(self):
-        if self.dimension == "amp":
-            thresh_amp = self.location
-            thresh_pw = self.base
+        if df.empty:
+            trials = pd.read_hdf("data/data.h5", "trials")
+            trials = trials.replace({"Result": {0: "Miss", 1: "Hit", 2: "FA", 3: "CR"}})
+            trials = trials.reset_index(level="Trial ID", drop=True)
+            points = (
+                trials.groupby(trials.index.names + ["Result"])
+                .size()
+                .unstack(fill_value=0)
+            )
+            self.df = points
         else:
-            thresh_pw = self.location
-            thresh_amp = self.base
-        return PulseTrain(amp=thresh_amp, pw=thresh_pw, freq=50, dur=500)
+            self.df = df
 
     @property
-    def q_thresh(self):
-        thresh_pulse = self.thresh_pulse
-        return thresh_pulse.pw * thresh_pulse.amp
+    def ind_var(self):
+        df = self.df
+        if (
+            get_index(df, "Amp2").nunique() > 1
+            and get_index(df, "Width2").nunique() > 1
+        ):
+            return ["Pulse Width", "Amplitude"]
+        if get_index(df, "Amp2").nunique() > 1:
+            return "Amplitude"
+        if get_index(df, "Width2").nunique() > 1:
+            return "Pulse Width"
 
+    @property
+    def acr(self):
+        df = self.df
+        return (df["Comp Current"] - df["Q_thresh"]) * 50
+
+    @property
+    def comp_charge(self):
+        df = self.df
+        df["Charge2"] = df.index.get_level_values("Amp2") * df.index.get_level_values(
+            "Width2"
+        )
+        return df
+
+    @property
+    def n(self):
+        df = self.df
+        df["n"] = df["Hit"] + df["Miss"]
+        return df
+
+    @property
+    def hit_rate(self):
+        df = self.df
+        df["Hit Rate"] = df["Hit"] / (df["Hit"] + df["Miss"])
+        return df
+
+    @classmethod
+    def fit_curve(cls, df):
+        import psignifit as pf
+
+        curve = df
+        data = df.to_numpy()
+        if len(data) > 3:
+            #     # param_free = [True, True, True, True]
+            #     # FArate = curve["FA_rate"].mean()
+            options = {"sigmoidName": "norm", "expType": "YesNo", "confP": [0.95]}
+
+            #     # def priorGamma(x):
+            #     #     return norm.pdf(x, FArate, 0.1)
+
+            #     # options["priors"] = [None, None, None, priorGamma, None]
+            result = pf.psignifit(data, options)
+            curve["location"] = result["Fit"][0]
+            curve["width"] = result["Fit"][1]
+            curve["lambda"] = result["Fit"][2]
+            curve["gamma"] = result["Fit"][3]
+            curve["beta"] = result["Fit"][4]
+            curve["location_CI_95"] = result["conf_Intervals"][0][0][0]
+            curve["width_CI_95"] = result["conf_Intervals"][1][0][0]
+            curve["lambda_CI_95"] = result["conf_Intervals"][2][0][0]
+            curve["gamma_CI_95"] = result["conf_Intervals"][3][0][0]
+            curve["beta_CI_95"] = result["conf_Intervals"][4][0][0]
+            curve["location_CI_5"] = result["conf_Intervals"][0][1][0]
+            curve["width_CI_5"] = result["conf_Intervals"][1][1][0]
+            curve["lambda_CI_5"] = result["conf_Intervals"][2][1][0]
+            curve["gamma_CI_5"] = result["conf_Intervals"][3][1][0]
+            curve["beta_CI_5"] = result["conf_Intervals"][4][1][0]
+        return curve
+
+    def fit_curves(self, dim):
+        df = self.df
+        if dim == "Charge":
+            df = self.comp_charge
+            const_vars = ["Freq2", "Dur2"]
+        elif dim == "Amp":
+            const_vars = ["Width2", "Freq2", "Dur2"]
+        elif dim == "Width":
+            const_vars = ["Amp2", "Freq2", "Dur2"]
+        df["Dimension"] = dim
+
+        # print(curve.index)
+        # data = curve[["Amp1", "Hits", "n"]].to_numpy()
+        #
+        df = df.groupby(curve_level_names + const_vars).apply(self.fit_curve)
+        return df
+
+    schema = DataFrameSchema(
+        {
+            "Hit": Column(int),
+            "Miss": Column(int),
+        },
+        index=MultiIndex(
+            curve_index_schema
+            + [
+                Index(float, name="Amp2"),
+                Index(float, name="Width2", checks=Check.eq(200)),
+                Index(float, name="Freq2", checks=Check.eq(50)),
+                Index(float, name="Dur2", checks=Check.eq(200)),
+            ]
+        ),
+        # checks=pa.Check(lambda df: )
+    )
+
+
+@pd.api.extensions.register_dataframe_accessor("curves")
+class Curves:
+    def __init__(self, df, points=None, dim=None):
+        self._df = self.schema.validate(df)
+
+    schema = DataFrameSchema(
+        columns={
+            "FAs": Column(int),
+            "CRs": Column(int),
+            "location": Column(float, nullable=True),
+            "width": Column(float, nullable=True),
+            "lambda": Column(float, nullable=True),
+            "gamma": Column(float, nullable=True),
+            "beta": Column(float, nullable=True),
+            "location_CI_95": Column(float, nullable=True),
+            "width_CI_95": Column(float, nullable=True),
+            "lambda_CI_95": Column(float, nullable=True),
+            "gamma_CI_95": Column(float, nullable=True),
+            "beta_CI_95": Column(float, nullable=True),
+            "location_CI_5": Column(float, nullable=True),
+            "width_CI_5": Column(float, nullable=True),
+            "lambda_CI_5": Column(float, nullable=True),
+            "gamma_CI_5": Column(float, nullable=True),
+            "beta_CI_5": Column(float, nullable=True),
+            "Amp2": Column(float, nullable=True),
+            "Width2": Column(float, nullable=True),
+        },
+        index=MultiIndex(curve_index_schema),
+    )
+
+    @property
     def ref_acr(self):
         return self.ref_pulse_train.q - self.q_thresh
 
     @property
+    def ref_charge(self):
+        df = self._df
+        return df.index.get_level_values("Amp1") * df.index.get_level_values("Width1")
+
+    @property
+    def acr(self):
+        df = self._df
+        df["Experiment Type"] = self.exp_type
+        df["Reference Charge"] = self.ref_charge
+        df = self.thresh_charge
+        df["Session Absolute Threshold Charge"] = self.q_thresh
+        df["Threshold ACR"] = (
+            df["Threshold Charge"]
+            + df["Reference Charge"]
+            - df["Session Absolute Threshold Charge"]
+        ) * 50
+        df["Reference ACR"] = (
+            df["Reference Charge"] - df["Session Absolute Threshold Charge"]
+        ) * 50
+        return df
+
+    @property
+    def thresh_charge(self):
+        df = self._df
+        df["Threshold Charge"] = df["Threshold Amp"] * df["Threshold PW"]
+        return df
+
+    @property
     def exp_type(self):
-        if self.ref_pulse_train.amp == 0 or self.ref_pulse_train.pw == 0:
-            return "Detection"
-        else:
-            return "Discrimination"
+        df = self._df
+        df["Ref Charge"] = df.index.get_level_values(
+            "Amp1"
+        ) * df.index.get_level_values("Width1")
+        df.loc[df["Ref Charge"] == 0, "Experiment Type"] = "Detection"
+        df.loc[df["Ref Charge"] != 0, "Experiment Type"] = "Discrimination"
+        return df
+
+    @property
+    def q_thresh(self):
+        df = self._df
+        df = df.groupby(["Monkey", "Date"]).apply(session_abs_thresh_q)
+        return df["Q_thresh"]
+
+    @property
+    def points(self):
+        df = self._df
+        points = Points().df
+        return df.join(points)
+
+    def label_thresholds(self):
+        df = self._df
+        amp_idx = pd.IndexSlice[:, :, :, :, :, :, :, :, "Amp"]
+        df.loc[amp_idx, "Threshold Amp"] = df.loc[amp_idx, "location"]
+        df.loc[amp_idx, "Threshold PW"] = df.loc[amp_idx, "Width2"]
+        pw_idx = pd.IndexSlice[:, :, :, :, :, :, :, :, "PW"]
+        df.loc[pw_idx, "Threshold Amp"] = df.loc[pw_idx, "Amp2"]
+        df.loc[pw_idx, "Threshold PW"] = df.loc[pw_idx, "location"]
+        return df
+
+    def weber(self, dim):
+        return self._df
 
 
 class Session:
@@ -191,7 +391,7 @@ class Session:
 
     @property
     def curves(self):
-        return Curve().df
+        return Curves().df
 
 
 def session_abs_thresh_q(session_df):
@@ -200,155 +400,39 @@ def session_abs_thresh_q(session_df):
     return session_df
 
 
-class CurveDF:
-    def __init__(self, df):
-        self.df = df
+class WeberFig:
+    def __init__(self, dim):
+        df = pd.read_hdf("data/data.h5", "curves")
+        df = df.curves.weber(dim)
+        self.df = df.reset_index()  # needed until plotly accepts mulitiindex
 
-    @property
-    def ref_charge(self):
-        df = self.df
-        return df.index.get_level_values("Ref Amp") * df.index.get_level_values(
-            "Ref PW"
-        )
+    def plot(self):
+        return self.df.plot()
+        # if df.empty:
+        #     return px.scatter()
+        # else:
+        #     return px.scatter(
+        #         df.reset_index(),
+        #         x=self.x,
+        #         y=self.y,
+        #         color="Monkey",
+        #         symbol=self.groupby,
+        #         template=template,
+        #         # size="count",
+        #     )
 
-    @property
-    def thresh_charge(self):
-        df = self.df
-        return df["location"] * df["base"]
-
-    @property
-    def acr(self):
-        df = self.df
-        df["Experiment Type"] = self.exp_type
-        df["Reference Charge"] = self.ref_charge
-        df["Threshold Charge"] = self.thresh_charge
-        df["Session Absolute Threshold Charge"] = self.q_thresh
-        df["Threshold ACR"] = (
-            df["Threshold Charge"]
-            + df["Reference Charge"]
-            - df["Session Absolute Threshold Charge"]
-        ) * 50
-        df["Reference ACR"] = (
-            df["Reference Charge"] - df["Session Absolute Threshold Charge"]
-        ) * 50
-        return df
-
-    @property
-    def exp_type(self):
-        df = self.df
-        df["Ref Charge"] = df.index.get_level_values(
-            "Ref Amp"
-        ) * df.index.get_level_values("Ref PW")
-        df.loc[df["Ref Charge"] == 0, "Experiment Type"] = "Detection"
-        df.loc[df["Ref Charge"] != 0, "Experiment Type"] = "Discrimination"
-        return df["Experiment Type"]
-
-    @property
-    def q_thresh(self):
-        df = self.df
-        df = df.groupby(["Monkey", "Date"]).apply(session_abs_thresh_q)
-        return df["Q_thresh"]
-
-    @property
-    def ind_var(self):
-        if "X dimension" in self.df.columns:
-            return self.df["X dimension"]
-        else:
-            return "Amplitude"
-
-    @property
-    def points(self):
-        df = self.df
-        points = Points().df
-        return df.join(points)
-
-
-def ind_var(pulses):
-    if pulses["Amplitude"].nunique() > 1 and pulses["Pulse Width"].nunique() > 1:
-        return ["Pulse Width", "Amplitude"]
-    if pulses["Amplitude"].nunique() > 1:
-        return "Amplitude"
-    if pulses["Pulse Width"].nunique() > 1:
-        return "Pulse Width"
-
-
-class Points:
-    def __init__(self, df=pd.DataFrame()):
-        if df.empty:
-            trials = pd.read_hdf("data/data.h5", "trials")
-            trials = trials.replace({"Result": {0: "Miss", 1: "Hit", 2: "FA", 3: "CR"}})
-            trials = trials.reset_index(level="Trial ID", drop=True)
-            points = (
-                trials.groupby(trials.index.names + ["Result"])
-                .size()
-                .unstack(fill_value=0)
-            )
-            self.df = points
-        else:
-            self.df = df
-
-    def ind_var():
-        pass
-
-    @property
-    def acr(self):
-        df = self.df
-        return (df["Comp Current"] - df["Q_thresh"]) * 50
-
-    @property
-    def comp_charge(self):
-        df = self.df
-        df["Comp Charge"] = df.index.get_level_values(
-            "Amp2"
-        ) * df.index.get_level_values("Width2")
-        return df
-
-    schema = DataFrameSchema(
-        {
-            "FAs": Column(float),
-            "CRs": Column(float),
-        },
-        index=MultiIndex(
-            [
-                Index(float, name="Monkey"),
-                Index("datetime64[ns]", name="Date"),
-                Index(float, name="Amp1"),
-                Index(float, name="Width1"),
-                Index(float, name="Freq1"),
-                Index(float, name="Dur1"),
-                Index(int, name="Active Channels"),
-                Index(int, name="Return Channels"),
-                Index(float, name="Amp2"),
-                Index(float, name="Width2"),
-                Index(float, name="Freq2"),
-                Index(float, name="Dur2"),
-            ]
-        ),
-    )
-
-
-class Trial:
     schema = DataFrameSchema(
         columns={
-            "Result": Column(int),
+            "Reference ACR": Column(float),
+            "Threshold ACR": Column(float),
+            "Reference Charge": Column(float),
+            "Threshold Charge": Column(float),
         },
         index=MultiIndex(
             [
                 Index(str, name="Monkey"),
-                Index("datetime64[ns]", name="Date"),
-                Index(float, name="Amp1"),
-                Index(float, name="Width1"),
-                Index(float, name="Freq1"),
-                Index(float, name="Dur1"),
-                Index(int, name="Active Channels"),
-                Index(int, name="Return Channels"),
-                Index(float, name="Amp2"),
-                Index(float, name="Width2"),
-                Index(float, name="Freq2"),
-                Index(float, name="Dur2"),
-                Index(int, name="Trial ID"),
+                Index(float, name="Ref Amp"),
+                Index(float, name="Ref PW"),
             ]
         ),
-        coerce=True,
-        strict="filter",
     )
