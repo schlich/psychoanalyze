@@ -1,7 +1,4 @@
-from psychoanalyze.data import Curves
-from factory import Factory, Dict, LazyAttribute
-from factory.fuzzy import FuzzyChoice
-from mimesis_factory import MimesisField as fake
+from factory import Factory, LazyAttribute
 import pandas as pd
 from datetime import date
 

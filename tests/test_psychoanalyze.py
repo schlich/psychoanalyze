@@ -1,5 +1,3 @@
-from factory import Factory
-from factory.fuzzy import FuzzyChoice
 from hypothesis.strategies import composite
 from psychoanalyze.data import Curves, Points, WeberFig
 from psychoanalyze.factories import CurveFactory
