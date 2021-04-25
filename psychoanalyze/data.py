@@ -4,6 +4,8 @@ import plotly.graph_objects as go
 import pandas as pd
 from pandera import DataFrameSchema, Column, Index, MultiIndex, Check
 
+pd.options.plotting.backend = "plotly"
+
 axis_settings = {
     "ticks": "outside",
     # "rangemode": "tozero",
