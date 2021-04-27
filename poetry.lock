@@ -226,6 +226,17 @@ optional = false
 python-versions = "*"
 
 [[package]]
+name = "dash-daq"
+version = "0.5.0"
+description = "DAQ components for Dash"
+category = "main"
+optional = false
+python-versions = "*"
+
+[package.dependencies]
+dash = ">=1.6.1"
+
+[[package]]
 name = "dash-html-components"
 version = "1.1.3"
 description = "Vanilla HTML components for Dash"
@@ -406,6 +417,14 @@ description = "Internationalized Domain Names in Applications (IDNA)"
 category = "main"
 optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
+
+[[package]]
+name = "inflection"
+version = "0.5.1"
+description = "A port of Ruby on Rails inflector to Python"
+category = "dev"
+optional = false
+python-versions = ">=3.5"
 
 [[package]]
 name = "iniconfig"
@@ -1179,6 +1198,19 @@ toml = "*"
 testing = ["argcomplete", "hypothesis (>=3.56)", "mock", "nose", "requests", "xmlschema"]
 
 [[package]]
+name = "pytest-factoryboy"
+version = "2.1.0"
+description = "Factory Boy support for pytest."
+category = "dev"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+factory-boy = ">=2.10.0"
+inflection = "*"
+pytest = ">=4.6"
+
+[[package]]
 name = "pytest-sugar"
 version = "0.9.4"
 description = "pytest-sugar is a plugin for pytest that changes the default look and feel of pytest (e.g. progressbar, show tests that fail instantly)."
@@ -1510,7 +1542,7 @@ python-versions = "*"
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.9.1"
-content-hash = "edf9f0557fe1a6843cfa392d158a01e341eeab2899cdc29f9714332e466904a6"
+content-hash = "b04f6ef3b343052c8256104bcfa470b15e7737d22c5f71504b0ab62baaafac5c"
 
 [metadata.files]
 anyio = [
@@ -1663,6 +1695,9 @@ dash = [
 dash-core-components = [
     {file = "dash_core_components-1.16.0.tar.gz", hash = "sha256:e8cdfaf3580577670bb2d1c3168efa06f5a7b439fbe5527cfaefa3e32394542f"},
 ]
+dash-daq = [
+    {file = "dash_daq-0.5.0.tar.gz", hash = "sha256:a1d85b6799f7b885652fbc44aebdb58c41254616a8d350b943beeb42ade4256a"},
+]
 dash-html-components = [
     {file = "dash_html_components-1.1.3.tar.gz", hash = "sha256:88adb77a674d5d7d0835d71c469f6e7b4aa692f9673808a474d244b71863c58a"},
 ]
@@ -1721,6 +1756,10 @@ hypothesis = [
 idna = [
     {file = "idna-2.10-py2.py3-none-any.whl", hash = "sha256:b97d804b1e9b523befed77c48dacec60e6dcb0b5391d57af6a65a312a90648c0"},
     {file = "idna-2.10.tar.gz", hash = "sha256:b307872f855b18632ce0c21c5e45be78c0ea7ae4c15c828c20788b26921eb3f6"},
+]
+inflection = [
+    {file = "inflection-0.5.1-py2.py3-none-any.whl", hash = "sha256:f38b2b640938a4f35ade69ac3d053042959b62a0f1076a5bbaa1b9526605a8a2"},
+    {file = "inflection-0.5.1.tar.gz", hash = "sha256:1a29730d366e996aaacffb2f1f1cb9593dc38e2ddd30c91250c6dde09ea9b417"},
 ]
 iniconfig = [
     {file = "iniconfig-1.1.1-py2.py3-none-any.whl", hash = "sha256:011e24c64b7f47f6ebd835bb12a743f2fbe9a26d4cecaa7f53bc4f35ee9da8b3"},
@@ -2128,6 +2167,10 @@ pyrsistent = [
 pytest = [
     {file = "pytest-6.2.3-py3-none-any.whl", hash = "sha256:6ad9c7bdf517a808242b998ac20063c41532a570d088d77eec1ee12b0b5574bc"},
     {file = "pytest-6.2.3.tar.gz", hash = "sha256:671238a46e4df0f3498d1c3270e5deb9b32d25134c99b7d75370a68cfbe9b634"},
+]
+pytest-factoryboy = [
+    {file = "pytest-factoryboy-2.1.0.tar.gz", hash = "sha256:23bc562ab32cc39eddfbbbf70e618a1b30e834a4cfa451c4bedc36216f0a7b19"},
+    {file = "pytest_factoryboy-2.1.0-py3-none-any.whl", hash = "sha256:10c02d2736cb52c7af28065db9617e7f50634e95eaa07eeb9a007026aa3dc0a8"},
 ]
 pytest-sugar = [
     {file = "pytest-sugar-0.9.4.tar.gz", hash = "sha256:b1b2186b0a72aada6859bea2a5764145e3aaa2c1cfbb23c3a19b5f7b697563d3"},
