@@ -1,7 +1,8 @@
 from hypothesis.strategies import composite
-from hypothesis.strategies._internal.core import sampled_from
+from pandas.core.frame import DataFrame
+from pandera.schema_components import Column
+from pandera import Check
 from psychoanalyze.data import Curves, Points, WeberFig
-from psychoanalyze.factories import CurveFactory
 import pandas as pd
 from hypothesis import given, strategies as st
 from datatest import validate
@@ -10,32 +11,12 @@ from scipy.stats import norm
 import pytest
 
 
-@pytest.fixture()
-def amp_curve():
-    return CurveFactory(dim="Amp")
-
-
-@pytest.fixture()
-def pw_curve():
-    return CurveFactory(dim="PW")
-
-
 curves_dfs = Curves.schema.strategy(size=10)
 curves = st.builds(Curves, curves_dfs)
 points_dfs = Points.schema.strategy(size=8)
 points = st.builds(Points, points_dfs)
 
 dims = st.sampled_from(["Amp", "Width", "Charge"])
-
-
-@pytest.fixture()
-def curves_df():
-    return Curves.schema.example(size=20)
-
-
-@pytest.fixture
-def curves(curves_df):
-    return Curves(curves_df)
 
 
 @composite
@@ -58,22 +39,17 @@ def test_initialize_points(points_df):
     Points.schema.validate(points.df)
 
 
-def test_WeberFig_initialize(curves):
+def test_WeberFig_initialize():
     WeberFig(dim="Amp")
 
 
-@pytest.mark.parametrize("dim", ["Amp", "PW"])
-def test_assign_axes(dim, amp_curve, pw_curve):
-    if dim == "Amp":
-        curves = amp_curve
-    else:
-        curves = pw_curve
-    df = curves.assign_axes(dim)
-    assert df[f"Threshold {dim}"].equals(df["location"])
-
-
-def test_weber_data_prep(amp_curve):
-    amp_curve.curves.weber("Amp")
+@pytest.mark.parametrize("exp_type", ["Detection", "Discrimination"])
+def test_filter_by_experiment_type(curves, exp_type):
+    curves = curves.filter_experiment_type(exp_type)
+    if exp_type == "Detection":
+        assert "Discrimination" not in curves["Experiment Type"]
+    elif exp_type == "Discrimination":
+        assert "Detection" not in curves["Experiment Type"]
 
 
 # def test_fit_curves(points):
@@ -94,7 +70,8 @@ def test_weber_data_prep(amp_curve):
 
 
 # def test_WeberFig_pooling(curves):
-#     weber_fig = WeberFig(curves, dim="Charge", pool=True)
+#     weber_fig = WeberFig("Amp", pool=True)
+#     # weber_fig.schema.set_index()
 #     assert "std" in weber_fig.df.columns
 #     assert "count" in weber_fig.df.columns
 

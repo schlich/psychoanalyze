@@ -1,5 +1,6 @@
 from collections import namedtuple
 from dataclasses import dataclass
+from pandas_flavor.register import register_dataframe_method
 import plotly.graph_objects as go
 import pandas as pd
 import pandas_flavor as pf
@@ -283,25 +284,42 @@ class Curves:
 
     schema = DataFrameSchema(
         columns={
-            "FAs": Column(int),
-            "CRs": Column(int),
-            "location": Column(float, nullable=True),
-            "width": Column(float, nullable=True),
-            "lambda": Column(float, nullable=True),
-            "gamma": Column(float, nullable=True),
-            "beta": Column(float, nullable=True),
-            "location_CI_95": Column(float, nullable=True),
-            "width_CI_95": Column(float, nullable=True),
-            "lambda_CI_95": Column(float, nullable=True),
-            "gamma_CI_95": Column(float, nullable=True),
-            "beta_CI_95": Column(float, nullable=True),
-            "location_CI_5": Column(float, nullable=True),
-            "width_CI_5": Column(float, nullable=True),
-            "lambda_CI_5": Column(float, nullable=True),
-            "gamma_CI_5": Column(float, nullable=True),
-            "beta_CI_5": Column(float, nullable=True),
-            "Amp2": Column(float, nullable=True),
-            "Width2": Column(float, nullable=True),
+            ("Amp", "FAs"): Column(int),
+            ("Amp", "CRs"): Column(int),
+            ("Amp", "Width2"): Column(float, nullable=True),
+            ("Amp", "location"): Column(float, nullable=True),
+            ("Amp", "width"): Column(float, nullable=True),
+            ("Amp", "lambda"): Column(float, nullable=True),
+            ("Amp", "gamma"): Column(float, nullable=True),
+            ("Amp", "beta"): Column(float, nullable=True),
+            ("Amp", "location_CI_95"): Column(float, nullable=True),
+            ("Amp", "width_CI_95"): Column(float, nullable=True),
+            ("Amp", "lambda_CI_95"): Column(float, nullable=True),
+            ("Amp", "gamma_CI_95"): Column(float, nullable=True),
+            ("Amp", "beta_CI_95"): Column(float, nullable=True),
+            ("Amp", "location_CI_5"): Column(float, nullable=True),
+            ("Amp", "width_CI_5"): Column(float, nullable=True),
+            ("Amp", "lambda_CI_5"): Column(float, nullable=True),
+            ("Amp", "gamma_CI_5"): Column(float, nullable=True),
+            ("Amp", "beta_CI_5"): Column(float, nullable=True),
+            ("PW", "FAs"): Column(int),
+            ("PW", "CRs"): Column(int),
+            ("PW", "Width2"): Column(float, nullable=True),
+            ("PW", "location"): Column(float, nullable=True),
+            ("PW", "width"): Column(float, nullable=True),
+            ("PW", "lambda"): Column(float, nullable=True),
+            ("PW", "gamma"): Column(float, nullable=True),
+            ("PW", "beta"): Column(float, nullable=True),
+            ("PW", "location_CI_95"): Column(float, nullable=True),
+            ("PW", "width_CI_95"): Column(float, nullable=True),
+            ("PW", "lambda_CI_95"): Column(float, nullable=True),
+            ("PW", "gamma_CI_95"): Column(float, nullable=True),
+            ("PW", "beta_CI_95"): Column(float, nullable=True),
+            ("PW", "location_CI_5"): Column(float, nullable=True),
+            ("PW", "width_CI_5"): Column(float, nullable=True),
+            ("PW", "lambda_CI_5"): Column(float, nullable=True),
+            ("PW", "gamma_CI_5"): Column(float, nullable=True),
+            ("PW", "beta_CI_5"): Column(float, nullable=True),
         },
         index=MultiIndex(curve_index_schema),
         strict=False,
@@ -339,9 +357,9 @@ class Curves:
         df["Threshold Charge"] = df["Threshold Amp"] * df["Threshold PW"]
         return df
 
-    @property
-    def exp_type(self):
-        df = self._df
+    @pf.register_dataframe_method
+    def classify_experiments(self):
+        df = self
         df["Ref Charge"] = df.index.get_level_values(
             "Amp1"
         ) * df.index.get_level_values("Width1")
@@ -361,24 +379,33 @@ class Curves:
         points = Points().df
         return df.join(points)
 
+    @register_dataframe_method
     def filter_dimension(self, dim):
-        return self._df.xs(dim, level="X Dimension")
+        df = self._df.xs(dim, level="X Dimension").copy()
+        params = ["Amp2", "Width2"]
+        params.remove(dim + "2")
+        return df.set_index(params, append=True)
+
+    @pf.register_dataframe_method
+    def filter_experiment_type(self, exp_type):
+        df = self.classify_experiments()
+        return df[df["Experiment Type"] == exp_type]
 
     @pf.register_dataframe_method
     def assign_axes(self, dim):
         df = self
         if dim == "Amp":
-            df["Threshold Amp"] = df["location"]
-            df["Threshold PW"] = df["Width2"]
+            df.loc[:, "Threshold Amp"] = df["location"]
+            df.loc[:, "Threshold PW"] = df["Width2"]
         else:
-            df["Threshold Amp"] = df["Amp2"]
-            df["Threshold PW"] = df["location"]
-        df["Reference Amp"] = df.index.get_level_values("Amp1")
-        df["Reference PW"] = df.index.get_level_values("Width1")
+            df.loc[:, "Threshold Amp"] = df["Amp2"]
+            df.loc[:, "Threshold PW"] = df["location"]
+        df.loc[:, "Reference Amp"] = df.index.get_level_values("Amp1")
+        df.loc[:, "Reference PW"] = df.index.get_level_values("Width1")
         return df
 
     def weber(self, dim):
-        df = self.filter_dimension(dim).assign_axes(dim)
+        df = self.filter_dimension(dim).filter_experiment_type("Discrimination")
         return df
 
 
@@ -412,12 +439,25 @@ def session_abs_thresh_q(session_df):
 
 
 class WeberFig:
-    def __init__(self, dim):
+    def __init__(self, dim, pool=False):
         df = pd.read_hdf("data/data.h5", "curves")
-        self.df = df.curves.weber(dim)
+        df = df.curves.weber(dim)
+        if pool:
+            df = (
+                df.groupby(df.index.names)["location"]
+                .agg(["mean", "std", "count"])
+                .rename(columns={"mean": "location"})
+            )
+        self.df = df
+        self.dim = dim
 
     def plot(self):
-        return self.df.plot()
+        return self.df.plot.scatter(
+            x=f"Reference {self.dim}",
+            y=f"Threshold {self.dim}",
+            color=["Monkey"],
+            template=template,
+        )
         # if df.empty:
         #     return px.scatter()
         # else:

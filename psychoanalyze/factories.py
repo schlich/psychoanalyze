@@ -1,49 +1,38 @@
-from factory import Factory, LazyAttribute
-import pandas as pd
-from datetime import date
+from factory import Factory
+from factory.declarations import SubFactory
+from mimesis_factory import MimesisField as fake
+from collections import namedtuple
 
 
-class CurveFactory(Factory):
+Fit = namedtuple("Fit", ["location", "width", "gamma", "lambda_", "beta"])
+Session = namedtuple("Session", ["Monkey", "Date"])
+PulseTrain = namedtuple("PulseTrain", ["Amp", "Width", "Freq", "Dur"])
+ChannelConfig = namedtuple("ChannelConfig", ["ActiveChannels", "ReturnChannels"])
+CurveIndex = namedtuple(
+    "CurveIndex", Session._fields + PulseTrain._fields + ChannelConfig._fields
+)
+
+
+class CurveIndexFactory(Factory):
     class Meta:
-        model = pd.DataFrame
+        model = CurveIndex
 
-    class Params:
-        dim = "Amp"
+    Monkey = fake("choice", items=["U", "Y", "Z"])
+    Date = fake("date")
+    Amp = fake("float_number")
+    Width = fake("float_number")
+    Freq = fake("float_number")
+    Dur = fake("float_number")
+    ActiveChannels = fake("integer_number", start=0, end=255)
+    ReturnChannels = fake("integer_number", start=0, end=255)
 
-    data = {
-        "FAs": 123,
-        "CRs": 12,
-        "location": 50.0,
-        "width": 10.0,
-        "lambda": 0.01,
-        "gamma": 0.1,
-        "beta": 0.01,
-        "location_CI_95": 1.0,
-        "width_CI_95": 1.0,
-        "lambda_CI_95": 0.01,
-        "gamma_CI_95": 0.01,
-        "beta_CI_95": 0.01,
-        "location_CI_5": 1.0,
-        "width_CI_5": 1.0,
-        "lambda_CI_5": 0.01,
-        "gamma_CI_5": 0.01,
-        "beta_CI_5": 0.01,
-        "Amp2": 0.0,
-        "Width2": 0.0,
-    }
-    index = LazyAttribute(
-        lambda o: pd.MultiIndex.from_tuples(
-            [("U", date(2017, 1, 1), 0.0, 200.0, 50.0, 200.0, 68, 11, o.dim)],
-            names=[
-                "Monkey",
-                "Date",
-                "Amp1",
-                "Width1",
-                "Freq1",
-                "Dur1",
-                "Active Channels",
-                "Return Channels",
-                "X Dimension",
-            ],
-        )
-    )
+
+class FitFactory(Factory):
+    class Meta:
+        model = Fit
+
+    location = fake("float_number")
+    width = fake("float_number")
+    gamma = fake("float_number")
+    lambda_ = fake("float_number")
+    beta = fake("float_number")
