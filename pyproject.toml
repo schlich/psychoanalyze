@@ -21,6 +21,7 @@ tables = "^3.6.1"
 numpy = "^1.20.2"
 ipywidgets = ">=7.5"
 dash-daq = "^0.5.0"
+tqdm = "^4.60.0"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.3"

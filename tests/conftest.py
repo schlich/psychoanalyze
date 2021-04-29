@@ -1,11 +1,10 @@
 import pytest
 import _pytest.skipping
-from psychoanalyze.factories import FitFactory, CurveIndexFactory
+from psychoanalyze.factories import CurveFactory
 import pandas as pd
 from pytest_factoryboy import register
 
-register(FitFactory)
-register(CurveIndexFactory)
+register(CurveFactory)
 
 
 def pytest_addoption(parser):
@@ -26,40 +25,5 @@ def pytest_cmdline_preparse(config, args):
 
 
 @pytest.fixture
-def curves(curve_index_factory, fit_factory):
-    amp_fit = fit_factory.create_batch(5)
-    pw_fit = fit_factory.create_batch(5)
-    curveindex = curve_index_factory.create_batch(5)
-    amp_df = pd.DataFrame(
-        amp_fit,
-        index=pd.MultiIndex.from_tuples(
-            curveindex,
-            names=[
-                "Monkey",
-                "Date",
-                "Amp1",
-                "Width1",
-                "Freq1",
-                "Dur1",
-                "Active Channels",
-                "Return Channels",
-            ],
-        ),
-    )
-    pw_df = pd.DataFrame(
-        pw_fit,
-        index=pd.MultiIndex.from_tuples(
-            curveindex,
-            names=[
-                "Monkey",
-                "Date",
-                "Amp1",
-                "Width1",
-                "Freq1",
-                "Dur1",
-                "Active Channels",
-                "Return Channels",
-            ],
-        ),
-    )
-    return pd.concat([amp_df, pw_df], axis=1, keys=["Amp", "PW"])
+def curves(curve_factory):
+    return pd.concat([curve_factory() for i in range(10)])

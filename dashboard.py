@@ -1,35 +1,49 @@
 import dash
 import dash_core_components as dcc
-import dash_daq as daq
+import dash_bootstrap_components as dbc
 import dash_html_components as html
-from dash.dependencies import Input, Output
-from psychoanalyze.data import Curves, WeberFig
-import pandas as pd
+from psychoanalyze.data import ThresholdFig, PsychoFig
 
-external_stylesheets = ["https://codepen.io/chriddyp/pen/bWLwgP.css"]
 
-app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app = dash.Dash(__name__, external_stylesheets=[dbc.themes.SPACELAB])
 
-curves = Curves(df=pd.read_hdf("data/data.h5", "curves"))
-fig = WeberFig(dim="Amp").plot()
+thresh_fig = ThresholdFig(dim="Amp").plot()
+psycho_fig = PsychoFig(dim="Amp").plot()
 
 app.layout = html.Div(
-    children=[
+    [
         html.H1(children="Psychoanalyze"),
         html.Div(
             children="""
-                A data visualization dashboard for psychophysics experiments.
-            """
+            A data visualization dashboard for psychophysics experiments.
+        """
         ),
-        daq.BooleanSwitch(id="pool", value=True),
-        dcc.Graph(id="weber-plot", figure=fig),
+        dbc.Tabs(
+            [
+                dbc.Tab(
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dcc.Graph(id="threshold-plot", figure=thresh_fig),
+                                width=8,
+                            ),
+                            dbc.Col(
+                                dcc.Graph(id="psycho-curves", figure=psycho_fig),
+                            ),
+                        ],
+                    ),
+                    label="Detection",
+                ),
+                dbc.Tab([], label="Discrimination"),
+            ]
+        ),
     ]
 )
 
 
-@app.callback(Output("weber-plot", "figure"), Input("pool", "value"))
-def pool_points(pool):
-    return WeberFig("Amp", pool=pool).plot()
+# @app.callback(Output("weber-plot", "figure"), Input("pool", "value"))
+# def pool_points(pool):
+#     return WeberFig("Amp").plot()
 
 
 if __name__ == "__main__":

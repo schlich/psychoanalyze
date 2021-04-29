@@ -1,10 +1,9 @@
-from factory import Factory
-from factory.declarations import SubFactory
+import pandas as pd
+from factory import Factory, SubFactory, List
 from mimesis_factory import MimesisField as fake
 from collections import namedtuple
 
 
-Fit = namedtuple("Fit", ["location", "width", "gamma", "lambda_", "beta"])
 Session = namedtuple("Session", ["Monkey", "Date"])
 PulseTrain = namedtuple("PulseTrain", ["Amp", "Width", "Freq", "Dur"])
 ChannelConfig = namedtuple("ChannelConfig", ["ActiveChannels", "ReturnChannels"])
@@ -29,10 +28,26 @@ class CurveIndexFactory(Factory):
 
 class FitFactory(Factory):
     class Meta:
-        model = Fit
+        model = dict
 
     location = fake("float_number")
     width = fake("float_number")
     gamma = fake("float_number")
     lambda_ = fake("float_number")
     beta = fake("float_number")
+
+
+class CurveMultiIndexFactory(Factory):
+    class Meta:
+        model = pd.MultiIndex.from_tuples
+
+    tuples = List([SubFactory(CurveIndexFactory) for i in range(1)])
+    names = CurveIndex._fields
+
+
+class CurveFactory(Factory):
+    class Meta:
+        model = pd.DataFrame
+
+    data = SubFactory(FitFactory)
+    index = SubFactory(CurveMultiIndexFactory)

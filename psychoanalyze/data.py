@@ -1,12 +1,12 @@
 from collections import namedtuple
 from dataclasses import dataclass
-from pandas_flavor.register import register_dataframe_method
 import plotly.graph_objects as go
 import pandas as pd
-import pandas_flavor as pf
 from pandera import DataFrameSchema, Column, Index, MultiIndex, Check
+from tqdm import tqdm
 
 pd.options.plotting.backend = "plotly"
+tqdm.pandas(desc="Fitting curves...")
 
 axis_settings = {
     "ticks": "outside",
@@ -117,6 +117,53 @@ def get_index(df, level):
     return df.index.get_level_values(level)
 
 
+def fit_curve(df):
+    import psignifit as psf
+
+    if (df["Hit Rate"] > 0.5).any() and (df["Hit Rate"] < 0.5).any():
+        df = df.drop(columns="Hit Rate")
+        data = df.to_numpy()
+        options = {
+            "sigmoidName": "norm",
+            "expType": "YesNo",
+            "confP": [0.95],
+            "nblocks": 1000,
+        }
+
+        #     # def priorGamma(x):
+        #     #     return norm.pdf(x, FArate, 0.1)
+
+        #     # options["priors"] = [None, None, None, priorGamma, None]
+        result = psf.psignifit(data, options)
+        results_df = pd.DataFrame(
+            [
+                {
+                    "Threshold": result["Fit"][0],
+                    "width": result["Fit"][1],
+                    "lambda": result["Fit"][2],
+                    "gamma": result["Fit"][3],
+                    "beta": result["Fit"][4],
+                    "location_CI_95": result["conf_Intervals"][0][0][0],
+                    "width_CI_95": result["conf_Intervals"][1][0][0],
+                    "lambda_CI_95": result["conf_Intervals"][2][0][0],
+                    "gamma_CI_95": result["conf_Intervals"][3][0][0],
+                    "beta_CI_95": result["conf_Intervals"][4][0][0],
+                    "location_CI_5": result["conf_Intervals"][0][1][0],
+                    "width_CI_5": result["conf_Intervals"][1][1][0],
+                    "lambda_CI_5": result["conf_Intervals"][2][1][0],
+                    "gamma_CI_5": result["conf_Intervals"][3][1][0],
+                    "beta_CI_5": result["conf_Intervals"][4][1][0],
+                }
+            ],
+            index=pd.MultiIndex.from_tuples(
+                [df.index.tolist()[0]], names=df.index.names
+            ),
+        )
+        return results_df
+    else:
+        return pd.DataFrame()
+
+
 @dataclass
 class PulseTrain:
     amp: float
@@ -135,6 +182,16 @@ class PulseTrain:
 class Trials:
     def __init__(self):
         self.df = pd.read_hdf("data/data.h5", "trials")
+
+    def to_points(self):
+        trials = pd.read_hdf("data/data.h5", "trials")
+        trials = trials.replace(
+            {"Result": {"0": "Miss", "1": "Hit", "2": "FA", "3": "CR"}}
+        )
+        trials = trials.reset_index(level="Trial ID", drop=True)
+        points = (
+            trials.groupby(trials.index.names + ["Result"]).size().unstack(fill_value=0)
+        )
 
     schema = DataFrameSchema(
         columns={
@@ -155,18 +212,11 @@ class Trials:
     )
 
 
+@pd.api.extensions.register_dataframe_accessor("points")
 class Points:
     def __init__(self, df=pd.DataFrame()):
         if df.empty:
-            trials = pd.read_hdf("data/data.h5", "trials")
-            trials = trials.replace({"Result": {0: "Miss", 1: "Hit", 2: "FA", 3: "CR"}})
-            trials = trials.reset_index(level="Trial ID", drop=True)
-            points = (
-                trials.groupby(trials.index.names + ["Result"])
-                .size()
-                .unstack(fill_value=0)
-            )
-            self.df = points
+            self.df = pd.read_hdf("data/data.h5", "points")
         else:
             self.df = df
 
@@ -208,54 +258,19 @@ class Points:
         df["Hit Rate"] = df["Hit"] / (df["Hit"] + df["Miss"])
         return df
 
-    @classmethod
-    def fit_curve(cls, df):
-        import psignifit as pf
-
-        curve = df
-        data = df.to_numpy()
-        if len(data) > 3:
-            #     # param_free = [True, True, True, True]
-            #     # FArate = curve["FA_rate"].mean()
-            options = {"sigmoidName": "norm", "expType": "YesNo", "confP": [0.95]}
-
-            #     # def priorGamma(x):
-            #     #     return norm.pdf(x, FArate, 0.1)
-
-            #     # options["priors"] = [None, None, None, priorGamma, None]
-            result = pf.psignifit(data, options)
-            curve["location"] = result["Fit"][0]
-            curve["width"] = result["Fit"][1]
-            curve["lambda"] = result["Fit"][2]
-            curve["gamma"] = result["Fit"][3]
-            curve["beta"] = result["Fit"][4]
-            curve["location_CI_95"] = result["conf_Intervals"][0][0][0]
-            curve["width_CI_95"] = result["conf_Intervals"][1][0][0]
-            curve["lambda_CI_95"] = result["conf_Intervals"][2][0][0]
-            curve["gamma_CI_95"] = result["conf_Intervals"][3][0][0]
-            curve["beta_CI_95"] = result["conf_Intervals"][4][0][0]
-            curve["location_CI_5"] = result["conf_Intervals"][0][1][0]
-            curve["width_CI_5"] = result["conf_Intervals"][1][1][0]
-            curve["lambda_CI_5"] = result["conf_Intervals"][2][1][0]
-            curve["gamma_CI_5"] = result["conf_Intervals"][3][1][0]
-            curve["beta_CI_5"] = result["conf_Intervals"][4][1][0]
-        return curve
+    def group_by_dimension(self, dim):
+        df = self.df
+        df = df.reset_index(level=dim + "1")
+        sizes = df.groupby(level=df.index.names).size()
+        valid_curves = sizes[sizes > 3]
+        new_points = df.loc[valid_curves.index]
+        return new_points.set_index(dim + "1", append=True)
 
     def fit_curves(self, dim):
-        df = self.df
-        if dim == "Charge":
-            df = self.comp_charge
-            const_vars = ["Freq2", "Dur2"]
-        elif dim == "Amp":
-            const_vars = ["Width2", "Freq2", "Dur2"]
-        elif dim == "Width":
-            const_vars = ["Amp2", "Freq2", "Dur2"]
-        df["Dimension"] = dim
-
-        # print(curve.index)
-        # data = curve[["Amp1", "Hits", "n"]].to_numpy()
-        #
-        df = df.groupby(curve_level_names + const_vars).apply(self.fit_curve)
+        df = self.df.reset_index(level=dim + "1")
+        df = df.points.n.dropna()
+        df = df[[dim + "1", "Hit", "n", "Hit Rate"]]
+        df = df.groupby(df.index.values, group_keys=False).progress_apply(fit_curve)
         return df
 
     schema = DataFrameSchema(
@@ -272,58 +287,14 @@ class Points:
                 Index(float, name="Dur2", checks=Check.eq(200)),
             ]
         ),
-        # checks=pa.Check(lambda df: )
     )
 
 
 @pd.api.extensions.register_dataframe_accessor("curves")
 class Curves:
-    def __init__(self, df, points=None, dim=None):
-        self._df = df
+    def __init__(self, df, dim=None):
+        self.df = df
         self.dim = dim
-
-    schema = DataFrameSchema(
-        columns={
-            ("Amp", "FAs"): Column(int),
-            ("Amp", "CRs"): Column(int),
-            ("Amp", "Width2"): Column(float, nullable=True),
-            ("Amp", "location"): Column(float, nullable=True),
-            ("Amp", "width"): Column(float, nullable=True),
-            ("Amp", "lambda"): Column(float, nullable=True),
-            ("Amp", "gamma"): Column(float, nullable=True),
-            ("Amp", "beta"): Column(float, nullable=True),
-            ("Amp", "location_CI_95"): Column(float, nullable=True),
-            ("Amp", "width_CI_95"): Column(float, nullable=True),
-            ("Amp", "lambda_CI_95"): Column(float, nullable=True),
-            ("Amp", "gamma_CI_95"): Column(float, nullable=True),
-            ("Amp", "beta_CI_95"): Column(float, nullable=True),
-            ("Amp", "location_CI_5"): Column(float, nullable=True),
-            ("Amp", "width_CI_5"): Column(float, nullable=True),
-            ("Amp", "lambda_CI_5"): Column(float, nullable=True),
-            ("Amp", "gamma_CI_5"): Column(float, nullable=True),
-            ("Amp", "beta_CI_5"): Column(float, nullable=True),
-            ("PW", "FAs"): Column(int),
-            ("PW", "CRs"): Column(int),
-            ("PW", "Width2"): Column(float, nullable=True),
-            ("PW", "location"): Column(float, nullable=True),
-            ("PW", "width"): Column(float, nullable=True),
-            ("PW", "lambda"): Column(float, nullable=True),
-            ("PW", "gamma"): Column(float, nullable=True),
-            ("PW", "beta"): Column(float, nullable=True),
-            ("PW", "location_CI_95"): Column(float, nullable=True),
-            ("PW", "width_CI_95"): Column(float, nullable=True),
-            ("PW", "lambda_CI_95"): Column(float, nullable=True),
-            ("PW", "gamma_CI_95"): Column(float, nullable=True),
-            ("PW", "beta_CI_95"): Column(float, nullable=True),
-            ("PW", "location_CI_5"): Column(float, nullable=True),
-            ("PW", "width_CI_5"): Column(float, nullable=True),
-            ("PW", "lambda_CI_5"): Column(float, nullable=True),
-            ("PW", "gamma_CI_5"): Column(float, nullable=True),
-            ("PW", "beta_CI_5"): Column(float, nullable=True),
-        },
-        index=MultiIndex(curve_index_schema),
-        strict=False,
-    )
 
     @property
     def ref_acr(self):
@@ -331,12 +302,12 @@ class Curves:
 
     @property
     def ref_charge(self):
-        df = self._df
+        df = self.df
         return df.index.get_level_values("Amp1") * df.index.get_level_values("Width1")
 
     @property
     def acr(self):
-        df = self._df
+        df = self.df
         df["Experiment Type"] = self.exp_type
         df["Reference Charge"] = self.ref_charge
         df = self.thresh_charge
@@ -353,59 +324,40 @@ class Curves:
 
     @property
     def thresh_charge(self):
-        df = self._df
+        df = self.df
         df["Threshold Charge"] = df["Threshold Amp"] * df["Threshold PW"]
-        return df
-
-    @pf.register_dataframe_method
-    def classify_experiments(self):
-        df = self
-        df["Ref Charge"] = df.index.get_level_values(
-            "Amp1"
-        ) * df.index.get_level_values("Width1")
-        df.loc[df["Ref Charge"] == 0, "Experiment Type"] = "Detection"
-        df.loc[df["Ref Charge"] != 0, "Experiment Type"] = "Discrimination"
         return df
 
     @property
     def q_thresh(self):
-        df = self._df
+        df = self.df
         df = df.groupby(["Monkey", "Date"]).apply(session_abs_thresh_q)
         return df["Q_thresh"]
 
     @property
     def points(self):
-        df = self._df
+        df = self.df
         points = Points().df
         return df.join(points)
 
-    @register_dataframe_method
-    def filter_dimension(self, dim):
-        df = self._df.xs(dim, level="X Dimension").copy()
-        params = ["Amp2", "Width2"]
-        params.remove(dim + "2")
-        return df.set_index(params, append=True)
-
-    @pf.register_dataframe_method
-    def filter_experiment_type(self, exp_type):
-        df = self.classify_experiments()
-        return df[df["Experiment Type"] == exp_type]
-
-    @pf.register_dataframe_method
-    def assign_axes(self, dim):
-        df = self
+    def label_axes(self, dim):
+        df = self.df
         if dim == "Amp":
-            df.loc[:, "Threshold Amp"] = df["location"]
-            df.loc[:, "Threshold PW"] = df["Width2"]
+            df.loc[:, "Threshold Amp"] = df["Threshold"]
+            df.loc[:, "Threshold PW"] = df.index.get_level_values("Width1")
         else:
-            df.loc[:, "Threshold Amp"] = df["Amp2"]
-            df.loc[:, "Threshold PW"] = df["location"]
-        df.loc[:, "Reference Amp"] = df.index.get_level_values("Amp1")
-        df.loc[:, "Reference PW"] = df.index.get_level_values("Width1")
+            df.loc[:, "Threshold Amp"] = df["Amp1"]
+            df.loc[:, "Threshold PW"] = df["Threshold"]
+        df.loc[:, "Reference Amp"] = df.index.get_level_values("Amp2")
+        df.loc[:, "Reference PW"] = df.index.get_level_values("Width2")
         return df
 
     def weber(self, dim):
-        df = self.filter_dimension(dim).filter_experiment_type("Discrimination")
+        df = self.df
+        df["Ref Charge"] = df.index.get_level_values(
+            "Amp2"
+        ) * df.index.get_level_values("Width2")
+        df = df[df["Ref Charge"] != 0]
         return df
 
 
@@ -439,14 +391,16 @@ def session_abs_thresh_q(session_df):
 
 
 class WeberFig:
-    def __init__(self, dim, pool=False):
-        df = pd.read_hdf("data/data.h5", "curves")
+    def __init__(self, dim, df=None, pool=False):
+        if df is None:
+            df = pd.read_hdf("data/data.h5", "curves/" + dim.lower())
+        df = df.curves.label_axes(dim)
         df = df.curves.weber(dim)
         if pool:
             df = (
-                df.groupby(df.index.names)["location"]
+                df.groupby(df.index.names)["Threshold"]
                 .agg(["mean", "std", "count"])
-                .rename(columns={"mean": "location"})
+                .rename(columns={"mean": "Threshold"})
             )
         self.df = df
         self.dim = dim
@@ -455,29 +409,52 @@ class WeberFig:
         return self.df.plot.scatter(
             x=f"Reference {self.dim}",
             y=f"Threshold {self.dim}",
-            color=["Monkey"],
+            color="Monkey",
             template=template,
         )
-        # if df.empty:
-        #     return px.scatter()
-        # else:
-        #     return px.scatter(
-        #         df.reset_index(),
-        #         x=self.x,
-        #         y=self.y,
-        #         color="Monkey",
-        #         symbol=self.groupby,
-        #         template=template,
-        #         # size="count",
-        #     )
 
-    @property
-    def schema(self):
-        schema = DataFrameSchema(
-            columns={
-                f"Reference {self.dim}": Column(float),
-                f"Threshold {self.dim}": Column(float),
-            },
-            index=MultiIndex(weber_index_schema),
+    schema = DataFrameSchema(
+        index=MultiIndex(weber_index_schema),
+    )
+
+
+class ThresholdFig:
+    def __init__(self, dim, df=None, pool=False):
+        if df is None:
+            df = pd.read_hdf("data/data.h5", "curves/" + dim.lower())
+        monkeys = pd.read_hdf("data/datatemp.h5", "monkeys").set_index("Monkey")
+        df = (
+            df.join(monkeys)
+            .reset_index()
+            .rename(columns={"Threshold": "Absolute Threshold"})
         )
-        return schema
+        df["Days from Implantation"] = (
+            df["Date"] - pd.to_datetime(df["Surgery Date"])
+        ).dt.days
+        self.df = df
+
+    def plot(self):
+        return self.df.plot.scatter(
+            x="Days from Implantation",
+            y="Absolute Threshold",
+            color="Monkey",
+            template=template,
+        )
+
+
+class PsychoFig:
+    def __init__(self, dim, df=None):
+        if df is None:
+            df = Points().df.reset_index()
+            df = df[df["Monkey"] == "Z"]
+        df = df.rename(columns={dim + "1": "Comparison " + dim})
+        df = df.points.hit_rate
+        self.df = df
+        self.dim = dim
+
+    def plot(self):
+        return self.df.plot.scatter(
+            x="Comparison " + self.dim,
+            y="Hit Rate",
+            color="Monkey",
+        )

@@ -1,22 +1,11 @@
 from hypothesis.strategies import composite
-from pandas.core.frame import DataFrame
-from pandera.schema_components import Column
-from pandera import Check
-from psychoanalyze.data import Curves, Points, WeberFig
+from psychoanalyze.data import Points, WeberFig
 import pandas as pd
-from hypothesis import given, strategies as st
+from hypothesis import strategies as st
 from datatest import validate
 import numpy as np
 from scipy.stats import norm
 import pytest
-
-
-curves_dfs = Curves.schema.strategy(size=10)
-curves = st.builds(Curves, curves_dfs)
-points_dfs = Points.schema.strategy(size=8)
-points = st.builds(Points, points_dfs)
-
-dims = st.sampled_from(["Amp", "Width", "Charge"])
 
 
 @composite
@@ -32,15 +21,15 @@ def df_to_fit(draw):
     return df
 
 
-@pytest.mark.skip
-@given(points_dfs)
-def test_initialize_points(points_df):
-    points = Points(df=points_df)
-    Points.schema.validate(points.df)
+# @given(points_dfs)
+# def test_initialize_points(points_df):
+#     points = Points(df=points_df)
+#     Points.schema.validate(points.df)
 
 
-def test_WeberFig_initialize():
-    WeberFig(dim="Amp")
+def test_WeberFig_initialize(amp_curves):
+    fig = WeberFig(dim="Amp", df=amp_curves)
+    WeberFig.schema.validate(fig.df)
 
 
 @pytest.mark.parametrize("exp_type", ["Detection", "Discrimination"])
