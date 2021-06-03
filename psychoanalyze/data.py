@@ -1,13 +1,20 @@
 from collections import namedtuple
 from dataclasses import dataclass
 import plotly.graph_objects as go
+import plotly.express as px
 import pandas as pd
-from pandera import DataFrameSchema, Column, Index, MultiIndex, Check
+import numpy as np
+from scipy.special import erfc, erfcinv
 from tqdm import tqdm
+from psychoanalyze.schemas import (
+    curve_schema,
+    amp_curve_schema,
+    pw_curve_schema,
+)
 
 pd.options.plotting.backend = "plotly"
 tqdm.pandas(desc="Fitting curves...")
-
+all_points = pd.read_hdf("data/data.h5", "points")
 axis_settings = {
     "ticks": "outside",
     # "rangemode": "tozero",
@@ -59,24 +66,6 @@ symbol_map = {
     "Multipolar": "circle-open",
     "Monopolar": "circle",
 }
-Level = namedtuple("Level", ["name", "pandas_dtype", "checks"])
-
-session_index_info = [
-    Level("Monkey", str, Check.isin(["U", "Y", "Z"])),
-    Level("Date", "datetime64[ns]", None),
-]
-curve_index_info = session_index_info + [
-    Level("Amp1", float, Check.ge(0)),
-    Level("Width1", float, Check.ge(0)),
-    Level("Freq1", float, Check.ge(0)),
-    Level("Dur1", float, Check.ge(0)),
-    Level("Active Channels", int, Check.in_range(0, 255)),
-    Level("Return Channels", int, Check.in_range(0, 255)),
-]
-session_index_schema = [Index(**level._asdict()) for level in session_index_info]
-curve_index_schema = [Index(**level._asdict()) for level in curve_index_info]
-weber_index_schema = curve_index_schema
-curve_level_names = [level.name for level in curve_index_info]
 
 CurveIndex = namedtuple(
     "CurveIndex",
@@ -120,6 +109,7 @@ def get_index(df, level):
 def fit_curve(df):
     import psignifit as psf
 
+    print(df.index)
     if (df["Hit Rate"] > 0.5).any() and (df["Hit Rate"] < 0.5).any():
         df = df.drop(columns="Hit Rate")
         data = df.to_numpy()
@@ -189,36 +179,18 @@ class Trials:
             {"Result": {"0": "Miss", "1": "Hit", "2": "FA", "3": "CR"}}
         )
         trials = trials.reset_index(level="Trial ID", drop=True)
-        points = (
+        return (
             trials.groupby(trials.index.names + ["Result"]).size().unstack(fill_value=0)
         )
-
-    schema = DataFrameSchema(
-        columns={
-            "Result": Column(int),
-        },
-        index=MultiIndex(
-            curve_index_schema
-            + [
-                Index(float, name="Amp2"),
-                Index(float, name="Width2"),
-                Index(float, name="Freq2"),
-                Index(float, name="Dur2"),
-                Index(int, name="Trial ID"),
-            ]
-        ),
-        coerce=True,
-        strict="filter",
-    )
 
 
 @pd.api.extensions.register_dataframe_accessor("points")
 class Points:
     def __init__(self, df=pd.DataFrame()):
         if df.empty:
-            self.df = pd.read_hdf("data/data.h5", "points")
-        else:
-            self.df = df
+            df = pd.read_hdf("data/data.h5", "points")
+        # points_schema.validate(df)
+        self.df = df
 
     @property
     def ind_var(self):
@@ -267,34 +239,43 @@ class Points:
         return new_points.set_index(dim + "1", append=True)
 
     def fit_curves(self, dim):
-        df = self.df.reset_index(level=dim + "1")
+        df = self.df
+        if dim in ["Amp", "Width"]:
+            df = df.reset_index(level=dim + "1")
+        elif dim == "Charge":
+            df = df.reset_index(level=["Amp1", "Width1"])
+            df["Charge"] = df["Amp1"] * df["Width1"]
+
         df = df.points.n.dropna()
-        df = df[[dim + "1", "Hit", "n", "Hit Rate"]]
+        if dim in ["Amp", "Width"]:
+            df = df[[dim + "1", "Hit", "n", "Hit Rate"]]
+        elif dim == "Charge":
+            df = df[["Charge", "Hit", "n", "Hit Rate"]]
         df = df.groupby(df.index.values, group_keys=False).progress_apply(fit_curve)
         return df
 
-    schema = DataFrameSchema(
-        {
-            "Hit": Column(int),
-            "Miss": Column(int),
-        },
-        index=MultiIndex(
-            curve_index_schema
-            + [
-                Index(float, name="Amp2"),
-                Index(float, name="Width2", checks=Check.eq(200)),
-                Index(float, name="Freq2", checks=Check.eq(50)),
-                Index(float, name="Dur2", checks=Check.eq(200)),
-            ]
-        ),
-    )
+    def plot_psycho(self):
+        df = self.df.points.n.reset_index()
+        return df.plot.scatter(x="Amp1", y="Hit Rate", size="n")
 
 
 @pd.api.extensions.register_dataframe_accessor("curves")
 class Curves:
+    schema = curve_schema
+
     def __init__(self, df, dim=None):
-        self.df = df
         self.dim = dim
+        if dim == "Amp":
+            self.fixed_dim = "Width"
+            self.schema = amp_curve_schema
+        elif dim == "Width":
+            self.fixed_dim = "Amp"
+            self.schema = pw_curve_schema
+        self.schema.validate(df)
+        self.df = df
+
+    def to_sessions(self):
+        return self.d.reset_index().set_index(["Monkey", "Date"]).index.unique()
 
     @property
     def ref_acr(self):
@@ -322,58 +303,253 @@ class Curves:
         ) * 50
         return df
 
-    @property
     def thresh_charge(self):
         df = self.df
-        df["Threshold Charge"] = df["Threshold Amp"] * df["Threshold PW"]
+        df.loc[:, "Threshold " + self.dim] = df["Threshold"]
+        df.loc[:, "Fixed " + self.fixed_dim] = df.index.get_level_values(
+            self.fixed_dim + "1"
+        )
+        df.loc[:, "Threshold Charge"] = (
+            df["Threshold " + self.dim] * df["Fixed " + self.fixed_dim]
+        )
         return df
 
     @property
-    def q_thresh(self):
+    def q_abs(self):
         df = self.df
         df = df.groupby(["Monkey", "Date"]).apply(session_abs_thresh_q)
-        return df["Q_thresh"]
+        return df["Q_0"]
+
+    def points(self, points):
+        df = self.df
+        points = points.points.hit_rate
+        df = df.join(points)
+        return df
+
+    def strength_duration(self, pool):
+        df = self.thresh_charge()
+        if pool:
+            df = self.pool_x(self.fixed_dim + "1", "Threshold Charge").rename(
+                columns={self.fixed_dim + "1": "Fixed " + self.fixed_dim}
+            )
+        return df.reset_index()
+
+    def label_axes(self):
+        df = self.df
+        df.loc[:, "Reference Amp"] = df.index.get_level_values("Amp2")
+        df.loc[:, "Reference Width"] = df.index.get_level_values("Width2")
+        return df
+
+    def channels(self):
+        df = self.df.reset_index(level=["Active Channels", "Return Channels"])
+
+        def to_bin_mask(channel_int):
+            return f"{channel_int:08b}"
+
+        def convert(s):
+            channels = [i + 1 for i, ltr in enumerate(s) if ltr == "1"]
+            return "+".join(map(str, channels))
+
+        df["Act Chan Mask"] = df["Active Channels"].apply(to_bin_mask)
+        df["Ret Chan Mask"] = df["Return Channels"].apply(to_bin_mask)
+        df["Channels"] = df["Ret Chan Mask"].apply(convert)
+        df = df.set_index(["Active Channels", "Return Channels"], append=True)
+        return df
+
+    def draw_fits(self, dim):
+        def my_norminv(p, mu, sigma):
+            x0 = -np.sqrt(2) * erfcinv(2 * p)
+            x = sigma * x0 + mu
+            return x
+
+        def my_normcdf(x, mu, sigma):
+            z = (x - mu) / sigma
+            p = 0.5 * erfc(-z / np.sqrt(2))
+            return p
+
+        def f(X, m, width):
+            # from psignifit
+            thresh_percent = 0.5
+            alpha = 0.05
+            C = my_norminv(1 - alpha, 0, 1) - my_norminv(alpha, 0, 1)
+            return my_normcdf(
+                X, (m - my_norminv(thresh_percent, 0, width / C)), width / C
+            )
+
+        def psy_fn(x, params, f):
+            g = params["gamma"]
+            psi = g + (1 - g - params["lambda"]) * f(
+                x, params["Threshold"], params["width"]
+            )
+            return psi
+
+        def add_fit(row):
+
+            params = {
+                "Threshold": row["Threshold"],
+                "width": row["width"],
+                "gamma": row["gamma"],
+                "lambda": row["lambda"],
+            }
+            x = np.linspace(row["mins"], row["maxes"])
+            y = psy_fn(x, params, f)
+            return pd.Series({"x": x, "Hit Rate": y})
+
+        df = self.df
+        df = df.set_index(pd.RangeIndex(len(df), name="id"), append=True)
+        fits = df.apply(add_fit, axis=1).rename(columns={"x": dim + "1"})
+        fits = pd.concat(
+            [
+                fits[dim + "1"].explode().to_frame(),
+                fits["Hit Rate"].explode().to_frame(),
+            ],
+            axis=1,
+        )
+        return fits
+
+    def filter_experiment_type(self, exp_type):
+        df = self.df
+        if exp_type == "Detection":
+            df = df[df.index.get_level_values("Amp2") == 0]
+        elif exp_type == "Discrimination":
+            df = df[df.index.get_level_values("Amp2") != 0]
+        return df
+
+    def pool_x(self, x_var, y_var):
+        df = self.df
+        df = (
+            df.groupby(level=["Monkey", x_var])[y_var]
+            .agg(["mean", "std", "count"])
+            .reset_index()
+            .rename(columns={"mean": y_var})
+        )
+        return df
+
+    def plot_psycho(self, points=False):
+        df = self.df
+        df = df.curves.channels()
+        line_df = df.curves.draw_fits(self.dim).reset_index()
+        if len(line_df["Monkey"]) > 1:
+            color = "Monkey"
+        else:
+            color = None
+        fits = px.line(
+            line_df,
+            x=self.dim + "1",
+            y="Hit Rate",
+            color=color,
+            # line_group="id",
+            template=template,
+        )
+        if points:
+            points_df = df.curves.points(all_points)
+            points_fig = points_df.points.plot_psycho()
+            for trace in points_fig.data:
+                fits.add_trace(trace)
+        return fits.update_layout(showlegend=False)
+
+    def plot_thresholds(self):
+        df = self.df
+        df = df.curves.filter_experiment_type("Detection")
+        df = df.curves.channels()
+        df = df.curves.days
+        df = df.reset_index().rename(
+            columns={"Threshold": "Absolute Threshold", "Width1": "Threshold Width"}
+        )
+        fig = df.plot.scatter(
+            x="Days from Implantation",
+            y="Absolute Threshold",
+            color="Monkey",
+            symbol="Channels",
+            template=template,
+        )
+        return fig.update_layout(showlegend=False)
+
+    def calculate_difference_thresholds(self, dim):
+        df = self.df.copy()
+        df["Difference Threshold"] = df["Threshold"] - df.index.get_level_values(
+            dim + "2"
+        )
+        return df
+
+    def plot_weber(self, pool, dim, regress=True):
+        df = self.df
+        df = df.curves.label_axes()
+        df = df.curves.filter_experiment_type("Discrimination")
+        df = df.curves.calculate_difference_thresholds(dim)
+        if pool:
+            df = (
+                df.curves.pool_x(dim + "2", "Difference Threshold")
+                .reset_index()
+                .rename(columns={dim + "2": "Reference " + dim})
+            )
+            size_var = "count"
+            std = "std"
+        else:
+            size_var = None
+            std = None
+            df = df.reset_index()
+        if regress:
+            trendline = "ols"
+        else:
+            trendline = None
+        return df.plot.scatter(
+            x=f"Reference {dim}",
+            y="Difference Threshold",
+            color="Monkey",
+            size=size_var,
+            error_y=std,
+            template=template,
+            trendline=trendline,
+        )
+
+    def plot_strength_duration(self, pool=False, regress=False):
+        sd_df = self.strength_duration(pool)
+        x = "Fixed " + self.fixed_dim
+        if regress:
+            trendline = "ols"
+        else:
+            trendline = None
+        fig = sd_df.plot.scatter(
+            x=x,
+            y="Threshold Charge",
+            color="Monkey",
+            template=template,
+            trendline=trendline,
+        )
+        return fig
+
+    def plot_time(self):
+        df = self.days
+        plot = df.reset_index().plot.scatter(
+            x="Days from Implantation", y="Width1", color="Monkey", template=template
+        )
+        return plot
 
     @property
-    def points(self):
+    def days(self):
         df = self.df
-        points = Points().df
-        return df.join(points)
+        monkeys = pd.read_hdf("data/data.h5", "monkeys").set_index("Monkey")
+        df = df.join(monkeys)
+        df["Days from Implantation"] = (
+            df.index.get_level_values("Date") - pd.to_datetime(df["Surgery Date"])
+        ).dt.days
+        return df
 
-    def label_axes(self, dim):
+    def get_dimension(self, dim):
         df = self.df
         if dim == "Amp":
-            df.loc[:, "Threshold Amp"] = df["Threshold"]
-            df.loc[:, "Threshold PW"] = df.index.get_level_values("Width1")
+            curves = df.set_index("Width1", append=True)
+        elif dim == "Width":
+            curves = df.set_index("Amp1", append=True)
         else:
-            df.loc[:, "Threshold Amp"] = df["Amp1"]
-            df.loc[:, "Threshold PW"] = df["Threshold"]
-        df.loc[:, "Reference Amp"] = df.index.get_level_values("Amp2")
-        df.loc[:, "Reference PW"] = df.index.get_level_values("Width2")
-        return df
-
-    def weber(self, dim):
-        df = self.df
-        df["Ref Charge"] = df.index.get_level_values(
-            "Amp2"
-        ) * df.index.get_level_values("Width2")
-        df = df[df["Ref Charge"] != 0]
-        return df
+            curves = df
+        return curves
 
 
 class Session:
     def __init__(self, *, monkey=None, date=None):
         pass
-
-    schema = DataFrameSchema(
-        columns={"Q_thresh": Column(float)},
-        index=MultiIndex(
-            [
-                Index(str, name="Monkey"),
-                Index("datetime64[ns]", name="Date"),
-            ]
-        ),
-    )
 
     @property
     def detection_curves(self):
@@ -386,75 +562,19 @@ class Session:
 
 def session_abs_thresh_q(session_df):
     detection_df = session_df[session_df["Experiment Type"] == "Detection"]
-    session_df["Q_thresh"] = detection_df["Threshold Charge"].mean()
+    session_df["Q_0"] = detection_df["Threshold Charge"].mean()
     return session_df
 
 
-class WeberFig:
-    def __init__(self, dim, df=None, pool=False):
-        if df is None:
-            df = pd.read_hdf("data/data.h5", "curves/" + dim.lower())
-        df = df.curves.label_axes(dim)
-        df = df.curves.weber(dim)
-        if pool:
-            df = (
-                df.groupby(df.index.names)["Threshold"]
-                .agg(["mean", "std", "count"])
-                .rename(columns={"mean": "Threshold"})
-            )
-        self.df = df
-        self.dim = dim
-
-    def plot(self):
-        return self.df.plot.scatter(
-            x=f"Reference {self.dim}",
-            y=f"Threshold {self.dim}",
-            color="Monkey",
-            template=template,
-        )
-
-    schema = DataFrameSchema(
-        index=MultiIndex(weber_index_schema),
-    )
-
-
-class ThresholdFig:
-    def __init__(self, dim, df=None, pool=False):
-        if df is None:
-            df = pd.read_hdf("data/data.h5", "curves/" + dim.lower())
-        monkeys = pd.read_hdf("data/datatemp.h5", "monkeys").set_index("Monkey")
-        df = (
-            df.join(monkeys)
-            .reset_index()
-            .rename(columns={"Threshold": "Absolute Threshold"})
-        )
-        df["Days from Implantation"] = (
-            df["Date"] - pd.to_datetime(df["Surgery Date"])
-        ).dt.days
-        self.df = df
-
-    def plot(self):
-        return self.df.plot.scatter(
-            x="Days from Implantation",
-            y="Absolute Threshold",
-            color="Monkey",
-            template=template,
-        )
-
-
-class PsychoFig:
-    def __init__(self, dim, df=None):
-        if df is None:
-            df = Points().df.reset_index()
-            df = df[df["Monkey"] == "Z"]
-        df = df.rename(columns={dim + "1": "Comparison " + dim})
-        df = df.points.hit_rate
-        self.df = df
-        self.dim = dim
-
-    def plot(self):
-        return self.df.plot.scatter(
-            x="Comparison " + self.dim,
-            y="Hit Rate",
-            color="Monkey",
-        )
+def combine_curve_dfs(amp_curves, pw_curves):
+    amp_curves = pd.read_hdf("data/data.h5", "curves/amp")
+    pw_curves = pd.read_hdf("data/data.h5", "curves/width")
+    amp_curves["Threshold Charge"] = amp_curves[
+        "Threshold"
+    ] * amp_curves.index.get_level_values("Width1")
+    pw_curves["Threshold Charge"] = pw_curves[
+        "Threshold"
+    ] * pw_curves.index.get_level_values("Amp1")
+    pw_curves = pw_curves.reset_index(level="Amp1")
+    amp_curves = amp_curves.reset_index(level="Width1")
+    return pd.concat([pw_curves, amp_curves])

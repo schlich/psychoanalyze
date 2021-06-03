@@ -1,44 +1,50 @@
-from hypothesis.strategies import composite
-from psychoanalyze.data import Points, WeberFig
+from psychoanalyze.data import Curves
 import pandas as pd
-from hypothesis import strategies as st
-from datatest import validate
 import numpy as np
-from scipy.stats import norm
 import pytest
-
-
-@composite
-def df_to_fit(draw):
-    max_amp = draw(st.floats(min_value=10, max_value=2000))
-    amp2_values = pd.Series([max_amp * i / 7 for i in range(8)])
-    df = amp2_values.to_frame()
-    mean = amp2_values.mean()
-    std = amp2_values.std() / 2
-    hr = pd.Series(norm(mean, std).cdf(amp2_values))
-    df["Hits"] = hr * 10
-    df["n"] = 10
-    return df
-
-
-# @given(points_dfs)
-# def test_initialize_points(points_df):
-#     points = Points(df=points_df)
-#     Points.schema.validate(points.df)
-
-
-def test_WeberFig_initialize(amp_curves):
-    fig = WeberFig(dim="Amp", df=amp_curves)
-    WeberFig.schema.validate(fig.df)
 
 
 @pytest.mark.parametrize("exp_type", ["Detection", "Discrimination"])
 def test_filter_by_experiment_type(curves, exp_type):
-    curves = curves.filter_experiment_type(exp_type)
+    curves = curves.curves.filter_experiment_type(exp_type)
     if exp_type == "Detection":
         assert "Discrimination" not in curves["Experiment Type"]
     elif exp_type == "Discrimination":
         assert "Detection" not in curves["Experiment Type"]
+
+
+@pytest.mark.parametrize("dim", ["Amp", "Width"])
+def test_plot_strength_duration_pooled(curve_factory, dim):
+    if dim == "Amp":
+        df = pd.concat(curve_factory.build_batch(10, data__Width1=200.0))
+        df = df.set_index("Width1", append=True)
+    elif dim == "Width":
+        df = pd.concat(curve_factory.build_batch(10, data__Amp1=200.0))
+        df = df.set_index("Amp1", append=True)
+    df.index = df.index.rename(
+        [
+            "Active Channels",
+            "Return Channels",
+        ],
+        level=[
+            "ActiveChannels",
+            "ReturnChannels",
+        ],
+    )
+    df = df.rename(
+        columns={
+            "ExperimentType": "Experiment Type",
+            "ThresholdCharge": "Threshold Charge",
+        }
+    )
+    if dim == "Amp":
+        curves = Curves(df, dim="Amp")
+    elif dim == "Width":
+        curves = Curves(df, dim="Width")
+    pooled_df = curves.strength_duration(pool=True)
+    unpooled_df = curves.strength_duration(pool=False)
+    assert len(pooled_df) == unpooled_df["Monkey"].nunique()
+    assert len(unpooled_df) == 10
 
 
 # def test_fit_curves(points):
@@ -85,21 +91,9 @@ def test_filter_by_experiment_type(curves, exp_type):
 #     assert points.ind_var == "Pulse Width"
 
 
-def test_points():
-    points = Points.schema.example(size=8)
-    assert "Amp2" in points.index.names
-
-
-# def test_curve_df_points(curves):
-#     points = curves.points
-#     assert "Amp2" in points.df.index.names
-
-
-def test_points_acr():
-    points = pd.DataFrame(
-        {"Comp Current": [1, 2, 3, 4, 5], "Q_thresh": [6, 7, 8, 9, 10]}
-    )
-    validate(Points(points).acr, (points["Comp Current"] - points["Q_thresh"]) * 50)
+def test_curve_df_points(amp_curves):
+    amp_points = amp_curves.curves.points()
+    assert "Amp1" in amp_points.index.names
 
 
 # @given(df_to_fit())
@@ -130,3 +124,32 @@ def test_curve_fit_single_curve():
 # def test_convert_points_to_curves(points, dim):
 #     curves_df = points.to_curves_df(dim)
 #     data.Curves.schema.validate(curves_df)
+
+
+def test_threshold_charge_calculation_amp(amp_curves):
+    amp_curves = Curves(amp_curves, dim="Amp").thresh_charge()
+    assert amp_curves["Threshold Charge"].equals(
+        amp_curves["Threshold"] * amp_curves["Fixed Width"]
+    )
+
+
+def test_threshold_charge_calculation_pw(pw_curves):
+    pw_curves = Curves(pw_curves, dim="Width").thresh_charge()
+    assert pw_curves["Threshold Charge"].equals(
+        pw_curves["Threshold"] * pw_curves["Fixed Amp"]
+    )
+
+
+def test_days_calculation(amp_curves):
+    amp_curves.curves.days
+
+
+def test_get_curves(curves):
+    dim = "Amp"
+    curves.curves.get_dimension(dim)
+
+
+def test_draw_fits(amp_curves):
+    amp_curves["mins"] = 0.0
+    amp_curves["maxes"] = 1000.0
+    amp_curves.curves.draw_fits("Amp")
