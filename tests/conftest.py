@@ -1,10 +1,13 @@
 import pytest
 import _pytest.skipping
-from psychoanalyze.factories import CurveFactory
-import pandas as pd
+from psychoanalyze.factories import (
+    CurvesFactory,
+    PointsFactory,
+)
 from pytest_factoryboy import register
 
-register(CurveFactory)
+register(CurvesFactory)
+register(PointsFactory)
 
 
 def pytest_addoption(parser):
@@ -24,41 +27,11 @@ def pytest_cmdline_preparse(config, args):
     _pytest.skipping.skip = no_skip
 
 
-@pytest.fixture
-def curves(curve_factory):
-    df = pd.concat(curve_factory.build_batch(10))
-    df.index = df.index.rename(
-        [
-            "Active Channels",
-            "Return Channels",
-        ],
-        level=[
-            "ActiveChannels",
-            "ReturnChannels",
-        ],
-    )
-    df = df.rename(
-        columns={
-            "ExperimentType": "Experiment Type",
-            "ThresholdCharge": "Threshold Charge",
-        }
-    )
-    return df
+@pytest.fixture(params=["Amp", "Width"])
+def curves(curves_factory, request):
+    return curves_factory(dim=request.param)
 
 
 @pytest.fixture
-def amp_curves(curves):
-    return curves.set_index("Width1", append=True)
-
-
-@pytest.fixture
-def pw_curves(curves):
-    return curves.set_index("Amp1", append=True)
-
-
-@pytest.fixture
-def amp_curves_monkeys(amp_curves):
-    amp_curves = amp_curves.reset_index()
-    amp_curves.iloc[0, "Monkey"] = "U"
-    amp_curves.iloc[1, "Monkey"] = "Y"
-    return amp_curves
+def points(points_factory):
+    return points_factory()

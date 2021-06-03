@@ -1,107 +1,118 @@
+from factory.declarations import LazyAttribute
 import pandas as pd
-from factory import Factory, SubFactory, List, lazy_attribute, RelatedFactoryList, Dict
+from factory import Factory, SubFactory, Dict, List
 from mimesis_factory import MimesisField as fake
-from collections import namedtuple
 from psychoanalyze.data import Curves, Points
-from pytest_factoryboy import register
+
+curve_indexes = {
+    "Monkey": List([fake("choice", items=["U", "Y", "Z"]) for _ in range(8)]),
+    "Date": List([fake("datetime") for _ in range(8)]),
+    "Amp2": fake("floats", start=0, n=8),
+    "Width2": fake("floats", start=0, n=8),
+    "Freq2": fake("floats", start=0, n=8),
+    "Dur2": fake("floats", start=0, n=8),
+    "Active Channels": fake("integers", start=0, end=255, n=8),
+    "Return Channels": fake("integers", start=0, end=255, n=8),
+}
 
 
-Session = namedtuple("Session", ["Monkey", "Date"])
-RefPulseTrain = namedtuple("RefPulseTrain", ["Amp2", "Width2", "Freq2", "Dur2"])
-ChannelConfig = namedtuple("ChannelConfig", ["ActiveChannels", "ReturnChannels"])
-TestPulseTrain = namedtuple("TestPulseTrain", ["Amp1", "Width1", "Freq1", "Dur1"])
-curve_index_fields = Session._fields + RefPulseTrain._fields + ChannelConfig._fields
-CurveIndex = namedtuple(
-    "CurveIndex",
-    curve_index_fields,
-)
-PointIndex = namedtuple(
-    "PointIndex",
-    curve_index_fields + TestPulseTrain._fields,
-)
-
-
-class CurveIndexFactory(Factory):
+class CurvesIndexDFFactory(Factory):
     class Meta:
-        model = CurveIndex
+        model = pd.DataFrame.from_records
 
-    Monkey = fake("choice", items=["U", "Y", "Z"])
-    Date = fake("date")
-    Amp2 = fake("float_number", start=0)
-    Width2 = fake("float_number", start=0)
-    Freq2 = fake("float_number", start=0)
-    Dur2 = fake("float_number", start=0)
-    ActiveChannels = fake("integer_number", start=0, end=255)
-    ReturnChannels = fake("integer_number", start=0, end=255)
+    data = Dict(curve_indexes)
+    columns = LazyAttribute(lambda o: o.data.keys())
 
 
-class FitFactory(Factory):
+class CurvesIndexFactory(Factory):
     class Meta:
-        model = dict
-        rename = {"location": "Threshold", "lambda_": "lambda"}
+        model = pd.MultiIndex.from_frame
 
-    location = fake("float_number")
-    width = fake("float_number")
-    gamma = fake("float_number")
-    lambda_ = fake("float_number")
-    beta = fake("float_number")
-    location_CI_95 = fake("float_number")
-    width_CI_95 = fake("float_number")
-    gamma_CI_95 = fake("float_number")
-    lambda_CI_95 = fake("float_number")
-    beta_CI_95 = fake("float_number")
-    location_CI_5 = fake("float_number")
-    width_CI_5 = fake("float_number")
-    gamma_CI_5 = fake("float_number")
-    lambda_CI_5 = fake("float_number")
-    beta_CI_5 = fake("float_number")
-    ExperimentType = fake("choice", items=["Detection", "Discrimination"])
-    Amp1 = fake("float_number", start=0)
-    Width1 = fake("float_number", start=0)
-    ThresholdCharge = fake("float_number")
-    mins = fake("float_number", start=0)
-    maxes = fake("float_number", start=0)
+    df = SubFactory(CurvesIndexDFFactory)
 
 
-class CurveMultiIndexFactory(Factory):
-    class Meta:
-        model = pd.MultiIndex.from_tuples
-
-    tuples = List([SubFactory(CurveIndexFactory) for i in range(1)])
-    names = CurveIndex._fields
-
-
-@register
-class CurveFactory(Factory):
+class CurvesDFFactory(Factory):
     class Meta:
         model = pd.DataFrame
 
-    data = SubFactory(FitFactory)
-    index = SubFactory(CurveMultiIndexFactory)
+    data = Dict(
+        {
+            "Threshold": fake("floats", n=8),
+            "width": fake("floats", n=8),
+            "gamma": fake("floats", n=8),
+            "lambda": fake("floats", n=8),
+            "beta": fake("floats", n=8),
+            "location_CI_95": fake("floats", n=8),
+            "width_CI_95": fake("floats", n=8),
+            "gamma_CI_95": fake("floats", n=8),
+            "lambda_CI_95": fake("floats", n=8),
+            "beta_CI_95": fake("floats", n=8),
+            "location_CI_5": fake("floats", n=8),
+            "width_CI_5": fake("floats", n=8),
+            "gamma_CI_5": fake("floats", n=8),
+            "lambda_CI_5": fake("floats", n=8),
+            "beta_CI_5": fake("floats", n=8),
+            "Experiment Type": List(
+                [
+                    fake("choice", items=["Detection", "Discrimination"])
+                    for _ in range(8)
+                ]
+            ),
+            "Amp1": fake("floats", n=8, start=0),
+            "Width1": fake("floats", n=8, start=0),
+            "Threshold Charge": fake("floats", n=8),
+            "mins": fake("floats", n=8, start=0),
+            "maxes": fake("floats", n=8, start=0),
+        }
+    )
+    index = SubFactory(CurvesIndexFactory)
 
 
-class PointIndexFactory(CurveIndexFactory):
+class PointIndexDFFactory(Factory):
     class Meta:
-        model = PointIndex
+        model = pd.DataFrame.from_records
 
-    Amp1 = fake("float_number", start=0)
-    Width1 = fake("float_number", start=0)
-    Freq1 = fake("float_number", start=0)
-    Dur1 = fake("float_number", start=0)
+    data = Dict(
+        curve_indexes
+        | {
+            "Amp1": fake("floats", start=0, n=8),
+            "Width1": fake("floats", start=0, n=8),
+            "Freq1": fake("floats", start=0, n=8),
+            "Dur1": fake("floats", start=0, n=8),
+        }
+    )
+    columns = LazyAttribute(lambda o: o.data.keys())
 
 
 class PointMultiIndexFactory(Factory):
     class Meta:
-        model = pd.MultiIndex.from_tuples
+        model = pd.MultiIndex.from_frame
 
-    tuples = List([SubFactory(PointIndexFactory, Width1=200.0) for i in range(8)])
-    names = PointIndex._fields
+    df = SubFactory(PointIndexDFFactory)
 
 
-@register
-class PointsFactory(Factory):
+class PointsDFFactory(Factory):
     class Meta:
         model = pd.DataFrame.from_records
 
-    data = Dict({"Hit Rate": fake("floats", start=0, end=1, n=8)})
+    data = Dict(
+        {
+            "Hit": fake("integers", n=8),
+            "Miss": fake("integers", n=8),
+        }
+    )
     index = SubFactory(PointMultiIndexFactory)
+
+
+class PointsFactory(Factory):
+    class Meta:
+        model = Points
+
+    df = SubFactory(PointsDFFactory)
+
+
+class CurvesFactory(Factory):
+    class Meta:
+        model = Curves
+
+    df = SubFactory(CurvesDFFactory)

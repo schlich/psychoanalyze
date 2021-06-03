@@ -4,12 +4,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
 import numpy as np
-from scipy.special import erfc, erfcinv
 from tqdm import tqdm
+from psychoanalyze.utils import psy_fn, f
 from psychoanalyze.schemas import (
     curve_schema,
     amp_curve_schema,
     pw_curve_schema,
+    points_schema,
 )
 
 pd.options.plotting.backend = "plotly"
@@ -186,11 +187,12 @@ class Trials:
 
 @pd.api.extensions.register_dataframe_accessor("points")
 class Points:
-    def __init__(self, df=pd.DataFrame()):
+    def __init__(self, df=pd.DataFrame(), dim="Amp"):
         if df.empty:
             df = pd.read_hdf("data/data.h5", "points")
-        # points_schema.validate(df)
+        points_schema.validate(df)
         self.df = df
+        self.dim = dim
 
     @property
     def ind_var(self):
@@ -255,21 +257,23 @@ class Points:
         return df
 
     def plot_psycho(self):
-        df = self.df.points.n.reset_index()
-        return df.plot.scatter(x="Amp1", y="Hit Rate", size="n")
+        df = self.n.points.hit_rate.reset_index()
+        return df.plot.scatter(x=self.dim + "1", y="Hit Rate", size="n")
 
 
 @pd.api.extensions.register_dataframe_accessor("curves")
 class Curves:
     schema = curve_schema
 
-    def __init__(self, df, dim=None):
+    def __init__(self, df, dim="Amp"):
         self.dim = dim
         if dim == "Amp":
-            self.fixed_dim = "Width"
+            df = df.set_index("Width1", append=True)
+            self.fixed = "Width"
             self.schema = amp_curve_schema
         elif dim == "Width":
-            self.fixed_dim = "Amp"
+            df = df.set_index("Amp1", append=True)
+            self.fixed = "Amp"
             self.schema = pw_curve_schema
         self.schema.validate(df)
         self.df = df
@@ -306,11 +310,9 @@ class Curves:
     def thresh_charge(self):
         df = self.df
         df.loc[:, "Threshold " + self.dim] = df["Threshold"]
-        df.loc[:, "Fixed " + self.fixed_dim] = df.index.get_level_values(
-            self.fixed_dim + "1"
-        )
+        df.loc[:, "Fixed " + self.fixed] = df.index.get_level_values(self.fixed + "1")
         df.loc[:, "Threshold Charge"] = (
-            df["Threshold " + self.dim] * df["Fixed " + self.fixed_dim]
+            df["Threshold " + self.dim] * df["Fixed " + self.fixed]
         )
         return df
 
@@ -322,15 +324,15 @@ class Curves:
 
     def points(self, points):
         df = self.df
-        points = points.points.hit_rate
+        # points = points.hit_rate
         df = df.join(points)
         return df
 
     def strength_duration(self, pool):
         df = self.thresh_charge()
         if pool:
-            df = self.pool_x(self.fixed_dim + "1", "Threshold Charge").rename(
-                columns={self.fixed_dim + "1": "Fixed " + self.fixed_dim}
+            df = self.pool_x(self.fixed + "1", "Threshold Charge").rename(
+                columns={self.fixed + "1": "Fixed " + self.fixed}
             )
         return df.reset_index()
 
@@ -357,34 +359,7 @@ class Curves:
         return df
 
     def draw_fits(self, dim):
-        def my_norminv(p, mu, sigma):
-            x0 = -np.sqrt(2) * erfcinv(2 * p)
-            x = sigma * x0 + mu
-            return x
-
-        def my_normcdf(x, mu, sigma):
-            z = (x - mu) / sigma
-            p = 0.5 * erfc(-z / np.sqrt(2))
-            return p
-
-        def f(X, m, width):
-            # from psignifit
-            thresh_percent = 0.5
-            alpha = 0.05
-            C = my_norminv(1 - alpha, 0, 1) - my_norminv(alpha, 0, 1)
-            return my_normcdf(
-                X, (m - my_norminv(thresh_percent, 0, width / C)), width / C
-            )
-
-        def psy_fn(x, params, f):
-            g = params["gamma"]
-            psi = g + (1 - g - params["lambda"]) * f(
-                x, params["Threshold"], params["width"]
-            )
-            return psi
-
         def add_fit(row):
-
             params = {
                 "Threshold": row["Threshold"],
                 "width": row["width"],
@@ -426,9 +401,8 @@ class Curves:
         return df
 
     def plot_psycho(self, points=False):
-        df = self.df
-        df = df.curves.channels()
-        line_df = df.curves.draw_fits(self.dim).reset_index()
+        df = self.channels()
+        line_df = self.draw_fits(self.dim).reset_index()
         if len(line_df["Monkey"]) > 1:
             color = "Monkey"
         else:
@@ -505,7 +479,7 @@ class Curves:
 
     def plot_strength_duration(self, pool=False, regress=False):
         sd_df = self.strength_duration(pool)
-        x = "Fixed " + self.fixed_dim
+        x = "Fixed " + self.fixed
         if regress:
             trendline = "ols"
         else:
@@ -535,16 +509,6 @@ class Curves:
             df.index.get_level_values("Date") - pd.to_datetime(df["Surgery Date"])
         ).dt.days
         return df
-
-    def get_dimension(self, dim):
-        df = self.df
-        if dim == "Amp":
-            curves = df.set_index("Width1", append=True)
-        elif dim == "Width":
-            curves = df.set_index("Amp1", append=True)
-        else:
-            curves = df
-        return curves
 
 
 class Session:
