@@ -1,4 +1,3 @@
-from psychoanalyze.data import Curves
 import pandas as pd
 import numpy as np
 import pytest
