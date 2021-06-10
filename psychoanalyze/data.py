@@ -1,5 +1,3 @@
-from collections import namedtuple
-from dataclasses import dataclass
 import plotly.graph_objects as go
 import plotly.express as px
 import pandas as pd
@@ -13,9 +11,27 @@ from psychoanalyze.schemas import (
     points_schema,
 )
 
+
+def combine_curve_dfs(amp_curves, pw_curves):
+    amp_curves = pd.read_hdf("data/data.h5", "curves/amp")
+    pw_curves = pd.read_hdf("data/data.h5", "curves/width")
+    amp_curves["Threshold Charge"] = amp_curves[
+        "Threshold"
+    ] * amp_curves.index.get_level_values("Width1")
+    pw_curves["Threshold Charge"] = pw_curves[
+        "Threshold"
+    ] * pw_curves.index.get_level_values("Amp1")
+    pw_curves = pw_curves.reset_index(level="Amp1")
+    amp_curves = amp_curves.reset_index(level="Width1")
+    return pd.concat([pw_curves, amp_curves])
+
+
 pd.options.plotting.backend = "plotly"
 tqdm.pandas(desc="Fitting curves...")
 all_points = pd.read_hdf("data/data.h5", "points")
+amp_curves = pd.read_hdf("data/data.h5", "curves/amp")
+pw_curves = pd.read_hdf("data/data.h5", "curves/width")
+all_curves = combine_curve_dfs(amp_curves, pw_curves)
 axis_settings = {
     "ticks": "outside",
     # "rangemode": "tozero",
@@ -68,44 +84,6 @@ symbol_map = {
     "Monopolar": "circle",
 }
 
-CurveIndex = namedtuple(
-    "CurveIndex",
-    [
-        "monkey",
-        "date",
-        "amp1",
-        "width1",
-        "freq1",
-        "dur1",
-        "active_channels",
-        "return_channels",
-        "x_dimension",
-    ],
-)
-CurveColumns = namedtuple(
-    "CurveColumns",
-    [
-        "false_alarms",
-        "correct_rejections",
-        "location",
-        "width",
-        "gamma",
-        "lambda_",
-        "beta",
-        "location_CI_95",
-        "width_CI_95",
-        "gamma_CI_95",
-        "lambda_CI_95",
-        "beta_CI_95",
-        "amp2",
-        "width2",
-    ],
-)
-
-
-def get_index(df, level):
-    return df.index.get_level_values(level)
-
 
 def fit_curve(df):
     import psignifit as psf
@@ -155,21 +133,6 @@ def fit_curve(df):
         return pd.DataFrame()
 
 
-@dataclass
-class PulseTrain:
-    amp: float
-    pw: float
-    freq: float
-    dur: float
-
-    @property
-    def q(self):
-        return self.amp * self.pw
-
-    # def acr(self, q_thresh):
-    #     return (self.q - q_thresh) * self.freq
-
-
 class Trials:
     def __init__(self):
         self.df = pd.read_hdf("data/data.h5", "trials")
@@ -194,18 +157,11 @@ class Points:
         self.df = df
         self.dim = dim
 
-    @property
-    def ind_var(self):
-        df = self.df
-        if (
-            get_index(df, "Amp2").nunique() > 1
-            and get_index(df, "Width2").nunique() > 1
-        ):
-            return ["Pulse Width", "Amplitude"]
-        if get_index(df, "Amp2").nunique() > 1:
-            return "Amplitude"
-        if get_index(df, "Width2").nunique() > 1:
-            return "Pulse Width"
+    def curves(self, all_curves):
+        points_df = self.df
+        curves_index = points_df.reset_index(level=["Amp1", "Width1", "Freq1", "Dur1"])
+        curves = all_curves.df.join(curves_index, how="inner")
+        return curves
 
     @property
     def acr(self):
@@ -229,7 +185,8 @@ class Points:
     @property
     def hit_rate(self):
         df = self.df
-        df["Hit Rate"] = df["Hit"] / (df["Hit"] + df["Miss"])
+        df["n"] = df["Hit"] + df["Miss"]
+        df["Hit Rate"] = df["Hit"] / df["n"]
         return df
 
     def group_by_dimension(self, dim):
@@ -257,7 +214,7 @@ class Points:
         return df
 
     def plot_psycho(self):
-        df = self.n.points.hit_rate.reset_index()
+        df = self.hit_rate.reset_index()
         return df.plot.scatter(x=self.dim + "1", y="Hit Rate", size="n")
 
 
@@ -268,13 +225,13 @@ class Curves:
     def __init__(self, df, dim="Amp"):
         self.dim = dim
         if dim == "Amp":
-            df = df.set_index("Width1", append=True)
             self.fixed = "Width"
             self.schema = amp_curve_schema
         elif dim == "Width":
-            df = df.set_index("Amp1", append=True)
             self.fixed = "Amp"
             self.schema = pw_curve_schema
+        if self.fixed + "1" in df.columns:
+            df = df.set_index(self.fixed + "1", append=True)
         self.schema.validate(df)
         self.df = df
 
@@ -322,11 +279,12 @@ class Curves:
         df = df.groupby(["Monkey", "Date"]).apply(session_abs_thresh_q)
         return df["Q_0"]
 
-    def points(self, points):
+    @property
+    def points(self):
         df = self.df
-        # points = points.hit_rate
-        df = df.join(points)
-        return df
+        points = pd.read_hdf("data/data.h5", "points")
+        df = df.join(points, how="inner")[points.columns]
+        return Points(df)
 
     def strength_duration(self, pool):
         df = self.thresh_charge()
@@ -343,8 +301,6 @@ class Curves:
         return df
 
     def channels(self):
-        df = self.df.reset_index(level=["Active Channels", "Return Channels"])
-
         def to_bin_mask(channel_int):
             return f"{channel_int:08b}"
 
@@ -352,10 +308,19 @@ class Curves:
             channels = [i + 1 for i, ltr in enumerate(s) if ltr == "1"]
             return "+".join(map(str, channels))
 
-        df["Act Chan Mask"] = df["Active Channels"].apply(to_bin_mask)
-        df["Ret Chan Mask"] = df["Return Channels"].apply(to_bin_mask)
+        df = self.df
+        df["Active Channels"] = df.index.get_level_values("Active Channels")
+        df["Return Channels"] = df.index.get_level_values("Return Channels")
+        df["Act Chan Mask"] = df["Active Channels"].map(to_bin_mask)
+        df["Ret Chan Mask"] = df["Return Channels"].map(to_bin_mask)
         df["Channels"] = df["Ret Chan Mask"].apply(convert)
-        df = df.set_index(["Active Channels", "Return Channels"], append=True)
+        df = df.drop(columns=["Active Channels", "Return Channels"])
+        return df
+
+    def get_extrema(self):
+        df = self.df
+        df["mins"] = 0
+        df["maxes"] = 1000
         return df
 
     def draw_fits(self, dim):
@@ -370,6 +335,7 @@ class Curves:
             y = psy_fn(x, params, f)
             return pd.Series({"x": x, "Hit Rate": y})
 
+        df = self.get_extrema()
         df = self.df
         df = df.set_index(pd.RangeIndex(len(df), name="id"), append=True)
         fits = df.apply(add_fit, axis=1).rename(columns={"x": dim + "1"})
@@ -382,12 +348,21 @@ class Curves:
         )
         return fits
 
-    def filter_experiment_type(self, exp_type):
+    @property
+    def exp_type(self):
         df = self.df
+        df.loc[df.index.get_level_values("Amp2") == 0, "Experiment Type"] = "Detection"
+        df.loc[
+            df.index.get_level_values("Amp2") != 0, "Experiment Type"
+        ] = "Discrimination"
+        return df
+
+    def filter_experiment_type(self, exp_type):
+        df = self.exp_type
         if exp_type == "Detection":
-            df = df[df.index.get_level_values("Amp2") == 0]
+            df = df.loc[df["Experiment Type"] == "Detection", :]
         elif exp_type == "Discrimination":
-            df = df[df.index.get_level_values("Amp2") != 0]
+            df = df.loc[df["Experiment Type"] == "Discrimination", :]
         return df
 
     def pool_x(self, x_var, y_var):
@@ -401,7 +376,6 @@ class Curves:
         return df
 
     def plot_psycho(self, points=False):
-        df = self.channels()
         line_df = self.draw_fits(self.dim).reset_index()
         if len(line_df["Monkey"]) > 1:
             color = "Monkey"
@@ -416,8 +390,7 @@ class Curves:
             template=template,
         )
         if points:
-            points_df = df.curves.points(all_points)
-            points_fig = points_df.points.plot_psycho()
+            points_fig = self.points.plot_psycho()
             for trace in points_fig.data:
                 fits.add_trace(trace)
         return fits.update_layout(showlegend=False)

@@ -12,11 +12,10 @@ def test_filter_by_experiment_type(curves, exp_type):
         assert "Detection" not in curves_df["Experiment Type"]
 
 
-def test_pool_sd_plot(curves_factory):
-    curves = curves_factory(dim="Amp", df__data__Width1=200.0)
+def test_pool_sd_plot(curves):
     pooled_df = curves.strength_duration(pool=True)
     unpooled_df = curves.strength_duration(pool=False)
-    assert len(unpooled_df) > len(pooled_df)
+    # assert len(unpooled_df) > len(pooled_df)
 
 
 # def test_fit_curves(points):
@@ -63,10 +62,13 @@ def test_pool_sd_plot(curves_factory):
 #     assert points.ind_var == "Pulse Width"
 
 
-# def test_curve_df_points(curves, points_factory):
-#     points = points_factory()
-#     points_1D = curves.points(points)
-#     assert curves.dim + "1" in points_1D.index.names
+def test_get_curves_from_points(points, curves):
+    curves_from_points = points.curves(curves)
+    assert len(curves_from_points) > 0
+
+
+def test_get_points_from_curves(curves):
+    curves.points
 
 
 # @given(df_to_fit())

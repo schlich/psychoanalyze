@@ -47,7 +47,9 @@ point_data_schema = {
 }
 
 curve_schema = DataFrameSchema(
-    curve_data_schema, index=MultiIndex(session_schema + curve_index_schema)
+    curve_data_schema,
+    index=MultiIndex(session_schema + curve_index_schema, ordered=False),
+    ordered=False,
 )
 
 points_schema = DataFrameSchema(
@@ -55,6 +57,7 @@ points_schema = DataFrameSchema(
     index=MultiIndex(
         session_schema + curve_index_schema + point_index_schema, ordered=False
     ),
+    ordered=False,
 )
 
 
