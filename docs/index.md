@@ -10,7 +10,7 @@
 
     *[Psychophysics](https://en.wikipedia.org/wiki/Psychophysics)* is a branch of study within behavioral psychology and neuroscience that provides an experimental and analytical framework for the broad purpose of quantifying and modeling the relationship between physical stimuli and perceptual experience.
 
-    For an excellent review of the history and impact of psychophysics, check out the following review published in *Neuroscience by J.C.A. Read: *[The place of human psychophysics in modern neuroscience](https://doi.org/10.1016/j.neuroscience.2014.05.036).
+    For an excellent overview of the history and impact of psychophysics, check out the following review published in *Neuroscience by J.C.A. Read: *[The place of human psychophysics in modern neuroscience](https://doi.org/10.1016/j.neuroscience.2014.05.036).
 
 
 ??? abstract "About the *alpha* release and our roadmap:"
