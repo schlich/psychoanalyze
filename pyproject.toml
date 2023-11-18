@@ -40,6 +40,7 @@ typer = { extras = ["all"], version = "^0.9.0" }
 kaleido = "0.2.1"
 pyarrow = "^12.0.1"
 duckdb = "^0.8.1"
+bambi = "^0.12.0"
 
 [tool.poetry.scripts]
 psychoanalyze = "psychoanalyze.main:app"

@@ -62,3 +62,7 @@ def test_normalize() -> None:
 def test_labels() -> None:
     """Given trial result integers, translates to labels."""
     assert trials.labels([0, 1]) == ["Miss", "Hit"]
+
+
+def test_counts():
+    assert trials.counts()
