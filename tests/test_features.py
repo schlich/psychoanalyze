@@ -56,7 +56,7 @@ class TestDataGenerationSimulation:
         # All x0 values should be finite
         assert np.all(np.isfinite(x0_values)), "All x0 values should be finite"
         
-        # All k values should be positive (HalfNormal ensures this)
+        # All k values should be positive (TruncatedNormal with lower=0 ensures this)
         assert np.all(k_values > 0), "All k values should be positive"
         
         # Check that observations are binary (0 or 1)
@@ -84,7 +84,8 @@ class TestDataGenerationSimulation:
         
         # Check that obs has shape corresponding to n_blocks * n_trials_per_block = 1 * 50 = 50
         obs_shape = idata.prior_predictive["obs"].shape
-        assert obs_shape[-1] == 50, f"Expected 50 trials, got {obs_shape[-1]}"
+        # Shape should be (draws, n_trials) = (500, 50)
+        assert obs_shape == (500, 50), f"Expected shape (500, 50), got {obs_shape}"
     
     def test_dashboard_usage_pattern(self):
         """Test the usage pattern from the Marimo dashboard."""
@@ -108,4 +109,5 @@ class TestDataGenerationSimulation:
         
         # Check that obs has correct shape: 2 blocks * 75 trials = 150
         obs_shape = idata.prior_predictive["obs"].shape
-        assert obs_shape[-1] == 150, f"Expected 150 trials, got {obs_shape[-1]}"
+        # Shape should be (draws, n_trials) where draws uses default of 500
+        assert obs_shape == (500, 150), f"Expected shape (500, 150), got {obs_shape}"

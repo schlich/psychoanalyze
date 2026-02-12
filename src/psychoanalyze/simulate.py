@@ -75,7 +75,13 @@ def run_prior_predictive(
         x0 = pm.Normal("x0", mu=logistic_prior.x0_mu, sigma=logistic_prior.x0_sigma)
         
         # Prior for steepness (k) - must be positive
-        k = pm.HalfNormal("k", sigma=logistic_prior.k_sigma)
+        # Use TruncatedNormal to respect both k_mu and k_sigma while ensuring k > 0
+        k = pm.TruncatedNormal(
+            "k",
+            mu=logistic_prior.k_mu,
+            sigma=logistic_prior.k_sigma,
+            lower=0,
+        )
         
         # Generate stimulus intensities
         x = np.linspace(0, 1, n_trials)
