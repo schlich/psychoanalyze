@@ -17,7 +17,8 @@ def app() -> None:
         version=f"%(prog)s {version('psychoanalyze')}",
     )
     
-    args = parser.parse_args()
+    # Parse arguments (args currently unused, but reserved for future subcommands)
+    parser.parse_args()
 
 
 if __name__ == "__main__":

@@ -14,7 +14,7 @@ def test_help_flag():
     )
     assert result.returncode == 0
     assert "psychoanalyze" in result.stdout
-    assert "usage" in result.stdout.lower() or "psychoanalyze" in result.stdout
+    assert "usage" in result.stdout.lower()
 
 
 def test_version_flag():
