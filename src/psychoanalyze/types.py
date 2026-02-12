@@ -45,11 +45,13 @@ class FitArtifacts:
     
     Attributes:
         idata: InferenceData object containing MCMC samples and diagnostics.
+               Typed as Any to avoid dependency on ArviZ at the type level.
+               At runtime, this should be an arviz.InferenceData instance.
         threshold: Estimated threshold parameter (x₀).
         slope: Estimated slope parameter (k).
         intercept: Estimated intercept or lapse rate parameter.
     """
-    idata: Any  # InferenceData from ArviZ, using Any for now
+    idata: Any  # arviz.InferenceData - using Any to avoid import dependency
     threshold: float
     slope: float
     intercept: float
