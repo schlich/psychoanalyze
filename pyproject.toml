@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "psychoanalyze"
+version = "1.0.0-alpha.1"
+description = "A tool for psychoanalysis"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+psychoanalyze = "psychoanalyze.main:app"
